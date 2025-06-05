@@ -48,6 +48,14 @@
         #eventTable {
             width: 100% !important; /* Ensure DataTables takes full width */
         }
+        .error-message {
+            color: #dc2626; /* Tailwind red-600 */
+            background-color: #fee2e2; /* Tailwind red-100 */
+            border: 1px solid #fca5a5; /* Tailwind red-300 */
+            padding: 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            margin-top: 1rem;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 p-4 md:p-8">
@@ -78,6 +86,9 @@
             </ol>
             <p class="mt-4 text-sm text-blue-600"><strong>Note on Pivot Tables:</strong> This setup provides robust sorting, searching, and pagination. True pivot table functionality directly from a static CSV on the client-side is more advanced. For that, you might explore libraries like <a href="https://webdatarocks.com/" target="_blank" class="underline hover:text-blue-800">WebDataRocks</a> (has free tier) or <a href="https://www.ag-grid.com/" target="_blank" class="underline hover:text-blue-800">ag-Grid</a> (community version is free), which offer more complex data manipulation capabilities but might have a steeper learning curve or different integration methods.</p>
         </div>
+        
+        <div id="tableErrorMessage" class="hidden error-message"></div>
+
 
         <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
             <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
@@ -102,11 +113,19 @@
         $(document).ready(function() {
             // Path to your CSV file - ensure this matches the filename you use.
             const csvFilePath = 'folkemoedet_events.csv';
+            const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
 
             // Enhanced CSV parsing function to handle commas within quoted fields
             function robustParseCSV(csvText) {
-                const lines = csvText.trim().split('\\n');
-                if (lines.length === 0) return { headers: [], data: [] };
+                // Normalize line endings (CRLF and CR to LF) then split by LF
+                const lines = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+                
+                if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === "")) {
+                    // Handle empty or effectively empty CSV after trimming
+                    console.warn("CSV content is empty or contains only whitespace after trimming.");
+                    return { headers: [], data: [] };
+                }
+
 
                 // Function to split a CSV line considering quotes
                 const splitCsvLine = (line) => {
@@ -123,22 +142,22 @@
                                 inQuotes = !inQuotes;
                             }
                         } else if (char === ',' && !inQuotes) {
-                            result.push(current.trim()); // No need to .replace(/^"|"$/g, '') here as we handle quotes directly
+                            result.push(current.trim()); 
                             current = '';
                         } else {
                             current += char;
                         }
                     }
-                    result.push(current.trim()); // Add the last field
-                    // Clean leading/trailing quotes from each field AFTER splitting
+                    result.push(current.trim()); 
                     return result.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
                 };
                 
                 const headers = splitCsvLine(lines[0]);
                 const data = [];
 
+                // Start data rows from the second line (index 1)
                 for (let i = 1; i < lines.length; i++) {
-                    if (lines[i].trim() === "") continue; // Skip empty lines
+                    if (lines[i].trim() === "") continue; 
                     const values = splitCsvLine(lines[i]);
                     if (values.length === headers.length) {
                         let row = {};
@@ -147,7 +166,7 @@
                         });
                         data.push(row);
                     } else {
-                        console.warn("Skipping malformed CSV line:", lines[i], "Expected", headers.length, "fields, got", values.length, "Values:", values);
+                        console.warn("Skipping malformed CSV line (field count mismatch):", `Line ${i+1}: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values);
                     }
                 }
                 return { headers, data };
@@ -157,16 +176,38 @@
             fetch(csvFilePath)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status} - Could not load ${csvFilePath}. Make sure the file exists in the same directory as this HTML file, and the filename is correct.`);
+                        // Provide a more specific error message based on status
+                        let errorDetail = `HTTP error! Status: ${response.status}.`;
+                        if (response.status === 404) {
+                            errorDetail += ` The file '${csvFilePath}' was not found. Please ensure it's in the same directory as this HTML file and the name is correct.`;
+                        } else {
+                            errorDetail += ` There was a problem fetching the file.`;
+                        }
+                        throw new Error(errorDetail);
                     }
                     return response.text();
                 })
                 .then(csvText => {
+                    tableErrorMessageDiv.classList.add('hidden'); // Hide error message if fetch was successful
+                    // console.log("Raw CSV Text:", csvText); // For debugging the raw fetched text
                     const { headers, data } = robustParseCSV(csvText);
+                    // console.log("Parsed Headers:", headers); // For debugging parsed headers
+                    // console.log("Parsed Data Rows:", data); // For debugging parsed data
 
-                    if (headers.length === 0) {
-                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not parse CSV headers. Check CSV format and file path.</td></tr></tbody>');
+                    if (headers.length === 0 ) {
+                         const message = `Could not parse CSV headers from '${csvFilePath}'. Check CSV format (especially the first line), file path, and ensure the file is not empty.`;
+                        console.error(message);
+                        tableErrorMessageDiv.textContent = message;
+                        tableErrorMessageDiv.classList.remove('hidden');
+                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not display data. See message above.</td></tr></tbody>');
                         return;
+                    }
+                    if (data.length === 0 && csvText.trim() !== "" && lines.length > 1) { // Only show "no data" if file wasn't empty but parsing yielded no data rows.
+                        const message = `Successfully parsed headers, but no data rows were found or parsed correctly in '${csvFilePath}'. Check CSV data rows format.`;
+                        console.warn(message); // Use warn as headers might be fine
+                        // Optionally display this message to the user, or let DataTables show "No data available in table"
+                        // tableErrorMessageDiv.textContent = message;
+                        // tableErrorMessageDiv.classList.remove('hidden');
                     }
                     
                     // Dynamically create table headers
@@ -189,18 +230,24 @@
                         language: {
                             search: "_INPUT_",
                             searchPlaceholder: "Search events...",
-                            lengthMenu: "Show _MENU_ entries"
+                            lengthMenu: "Show _MENU_ entries",
+                            zeroRecords: "No matching events found",
+                            emptyTable: "No events available in table" // Message when dataSet is empty
                         },
                         order: [[0, 'asc']], // Sort by the first column (Weekday) in ascending order
-                        columnDefs: [ // Making specific columns less wide if they tend to be short
-                            { width: '10%', targets: 0 }, // Weekday
-                            { width: '15%', targets: 1 }  // Time
+                        columnDefs: [ 
+                            { width: '10%', targets: 0 }, 
+                            { width: '15%', targets: 1 }  
                         ]
                     });
                 })
                 .catch(error => {
-                    console.error('Error fetching or parsing CSV:', error);
-                    $('#eventTable').html(`<thead><tr><th>Error</th></tr></thead><tbody><tr><td>${error.message}</td></tr></tbody>`);
+                    console.error('Error initializing table:', error);
+                    const fullErrorMessage = `Failed to load or process '${csvFilePath}'. Error: ${error.message}. Check the browser's developer console (F12) for more details, and verify the file location and name.`;
+                    tableErrorMessageDiv.textContent = fullErrorMessage;
+                    tableErrorMessageDiv.classList.remove('hidden');
+                    // Display a simpler message in the table itself
+                    $('#eventTable').html(`<thead><tr><th>Loading Error</th></tr></thead><tbody><tr><td>Could not load event data. Please see error message above the table.</td></tr></tbody>`);
                 });
         });
     </script>
