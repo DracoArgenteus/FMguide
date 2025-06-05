@@ -53,7 +53,7 @@
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 10% auto; padding: 25px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
         .modal-header { padding-bottom: 10px; border-bottom: 1px solid #eee; font-size: 1.25rem; font-weight: 600; }
-        .modal-body { padding-top:15px; padding-bottom: 15px; white-space: pre-wrap; }
+        .modal-body { padding-top:15px; padding-bottom: 15px; white-space: pre-wrap; } /* pre-wrap helps render newlines */
         .modal-footer { padding-top: 10px; border-top: 1px solid #eee; text-align: right; }
         .close-button { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
         .close-button:hover { background-color: #dc2626; }
@@ -70,7 +70,7 @@
         <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
             <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
             <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist and are correctly populated.</li>
+                <li>Ensure `data/folkemoedet_private_events.csv` (use v2 when provided) and `data/official_events_combined.csv` exist.</li>
                 <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
                 <li>Use the "Day" buttons to filter by weekday.</li>
                 <li>Click on truncated descriptions or links for more details.</li>
@@ -139,7 +139,7 @@
         };
 
         $(document).ready(function() {
-            const privateCsvPath = 'data/folkemoedet_private_events.csv';
+            const privateCsvPath = 'data/folkemoedet_private_events.csv'; // Will be v2 later
             const officialCsvPath = 'data/official_events_combined.csv';
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
@@ -152,30 +152,81 @@
             const closeModalButton = document.getElementById('closeModalButton');
 
             function robustParseCSV(csvText) {
-                const lines = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-                if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === "")) {
-                    return { headers: [], data: [] };
+                const data = [];
+                let headers = [];
+                // Normalize line endings
+                const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                
+                // Regex to split CSV rows, correctly handling newlines within quoted fields
+                // This regex looks for a newline character that is NOT preceded by an odd number of quotes
+                // (meaning it's not inside a properly quoted field).
+                // This is a simplification; truly robust CSV parsing for all edge cases is complex.
+                // A common approach is to find a delimiter (,) that is not inside quotes.
+                
+                const lines = [];
+                let inQuotes = false;
+                let currentLine = "";
+                for (let i = 0; i < normalizedCsvText.length; i++) {
+                    const char = normalizedCsvText[i];
+                    currentLine += char;
+                    if (char === '"') {
+                        // Handle "" as an escaped quote inside a field
+                        if (i + 1 < normalizedCsvText.length && normalizedCsvText[i+1] === '"') {
+                            currentLine += '"'; // Add the second quote
+                            i++; // Skip the next quote
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === '\n' && !inQuotes) {
+                        lines.push(currentLine.trim());
+                        currentLine = "";
+                    }
                 }
-                const splitCsvLine = (line) => {
-                    const result = []; let current = ''; let inQuotes = false;
+                if (currentLine.trim()) { // Add the last line if any
+                    lines.push(currentLine.trim());
+                }
+
+                if (lines.length === 0) return { headers, data };
+
+                // Function to split a single CSV line into fields, respecting quotes
+                const splitCsvFields = (line) => {
+                    const fields = [];
+                    let currentField = "";
+                    let inFieldQuotes = false;
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
-                        if (char === '"') { if (i + 1 < line.length && line[i+1] === '"') { current += '"'; i++; } else { inQuotes = !inQuotes; } } 
-                        else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; } 
-                        else { current += char; }
+                        if (char === '"') {
+                            if (inFieldQuotes && i + 1 < line.length && line[i+1] === '"') {
+                                currentField += '"'; // Escaped quote
+                                i++; // Skip next quote
+                            } else {
+                                inFieldQuotes = !inFieldQuotes;
+                            }
+                        } else if (char === ',' && !inFieldQuotes) {
+                            fields.push(currentField);
+                            currentField = "";
+                        } else {
+                            currentField += char;
+                        }
                     }
-                    result.push(current.trim()); 
-                    return result.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                    fields.push(currentField); // Add the last field
+                    return fields.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"')); // Clean surrounding quotes and internal escaped quotes
                 };
-                const headers = splitCsvLine(lines[0]);
-                const data = [];
+
+                headers = splitCsvFields(lines[0]);
+                
                 for (let i = 1; i < lines.length; i++) {
-                    if (lines[i].trim() === "") continue; 
-                    const values = splitCsvLine(lines[i]);
+                    if (lines[i].trim() === "") continue;
+                    const values = splitCsvFields(lines[i]);
                     if (values.length === headers.length) {
-                        let row = {}; headers.forEach((header, index) => { row[header] = values[index]; });
+                        let row = {};
+                        headers.forEach((header, index) => {
+                            row[header.trim()] = values[index]; // Trim header name just in case
+                        });
                         data.push(row);
-                    } else { console.warn("Skipping malformed CSV line (field count mismatch):", `Line ${i+1}: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length); }
+                    } else {
+                        console.warn(`Skipping malformed CSV line (field count mismatch after attempting multi-line parse): Line ${i+1} -> Content: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values);
+                    }
                 }
                 return { headers, data };
             }
@@ -207,7 +258,7 @@
             }
 
             function normalizeData(rawData, sourceName, map) {
-                return rawData.map((rawEvent, index) => { // Added index for logging
+                return rawData.map((rawEvent, index) => { 
                     const normalizedEvent = { DataSource: sourceName }; 
                     UNIFIED_HEADERS.forEach(header => {
                         if (header !== 'DataSource') {
@@ -233,8 +284,7 @@
                         }
                         delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
                     }
-                    // Log the DataSource for the first few items from each source for debugging
-                    if (index < 2) { // Log first 2 items
+                    if (index < 2) { 
                         console.log(`Normalized event [${index}] from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}'`);
                     }
                     return normalizedEvent;
@@ -377,15 +427,13 @@
                     console.log("Table has no data when trying to log unique DataSource values.");
                 }
 
-                // Apply source filter using exact match regex, case-insensitive
                 let sourceSearchTermRegex = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
                 console.log(`Applying DataSource search with regex: '${sourceSearchTermRegex}' (case-insensitive) to column index ${dataSourceColIdx}`);
-                eventDataTable.column(dataSourceColIdx).search(sourceSearchTermRegex, true, false, true).draw(false); // regex=true, smart=false, caseInsensitive=true
+                eventDataTable.column(dataSourceColIdx).search(sourceSearchTermRegex, true, false, true).draw(false);
 
-                // Apply day filter
                 let daySearchTermRegex = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
                 console.log(`Applying Weekday search with regex: '${daySearchTermRegex}' (case-insensitive) to column index ${weekdayColIdx}`);
-                eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); // Also make day filter case-insensitive
+                eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); 
 
                 eventDataTable.draw(); 
                 console.log("Table redrawn with filters. Matching rows:", eventDataTable.rows({ search: 'applied' }).count());
