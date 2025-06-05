@@ -1,0 +1,68 @@
+name: Merge Folkemødet Official Program CSVs
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  # Triggers the workflow on push events
+  push:
+    branches:
+      - main # Or your default branch, e.g., master
+    paths:
+      # Trigger if any of the source CSV files in the data/ directory change
+      - 'data/folkemoedet_program_torsdag.csv'
+      - 'data/folkemoedet_program_fredag.csv'
+      - 'data/folkemoedet_program_lørdag.csv'
+      # Trigger if the merge script itself changes (assuming it's in the root)
+      - 'scripts/merge_csvs.py' 
+      # Trigger if this workflow file changes
+      - '.github/workflows/merge_csvs.yml'
+
+jobs:
+  merge-and-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to commit changes back to the repository
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x' 
+
+      - name: Run CSV Merge Script
+        run: |
+          echo "Running Python script to merge CSV files..."
+          # This assumes merge_csvs.py is in the repo root and is written
+          # to handle input/output within a 'data/' subdirectory.
+          # For example, your Python script should set its source_dir = "data"
+          python merge_csvs.py 
+        # The Python script is expected to create/update 'data/official_events_combined.csv'
+
+      - name: Commit and push changes
+        run: |
+          echo "Configuring Git user..."
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com" 
+          
+          echo "Adding data/official_events_combined.csv to staging..."
+          git add data/official_events_combined.csv
+          
+          echo "Checking for changes to commit..."
+          # Check if there are staged changes for the combined file in the data directory
+          if git diff --staged --quiet data/official_events_combined.csv; then
+            echo "No changes to data/official_events_combined.csv to commit."
+          else
+            echo "Changes detected in data/official_events_combined.csv. Committing..."
+            git commit -m "Automated CSV merge: Update data/official_events_combined.csv"
+            echo "Pushing changes..."
+            git push
+            echo "Changes pushed successfully."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
