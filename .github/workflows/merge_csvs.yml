@@ -13,7 +13,7 @@ on:
       - 'data/folkemoedet_program_torsdag.csv'
       - 'data/folkemoedet_program_fredag.csv'
       - 'data/folkemoedet_program_lørdag.csv'
-      # Trigger if the merge script itself changes (assuming it's in the root)
+      # Trigger if the merge script itself changes (now in scripts/ subdir)
       - 'scripts/merge_csvs.py' 
       # Trigger if this workflow file changes
       - '.github/workflows/merge_csvs.yml'
@@ -37,12 +37,10 @@ jobs:
 
       - name: Run CSV Merge Script
         run: |
-          echo "Running Python script to merge CSV files..."
-          # This assumes merge_csvs.py is in the repo scripts/ subdirectory and is written
-          # to handle input/output within a 'data/' subdirectory.
-          # For example, your Python script should set its source_dir = "data"
-          python ./scripts/merge_csvs.py 
-        # The Python script is expected to create/update 'data/official_events_combined.csv'
+          echo "Running Python script from scripts/ subdirectory to merge CSV files..."
+          python scripts/merge_csvs.py 
+        # The Python script is expected to handle its input/output relative to the 'data/' directory
+        # as configured within the Python script itself.
 
       - name: Commit and push changes
         run: |
