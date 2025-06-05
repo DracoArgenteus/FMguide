@@ -82,43 +82,43 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 300px; /* Adjust as needed, or use a more dynamic approach */
+            max-width: 250px; /* Adjusted max-width for description */
             cursor: pointer;
-            color: #2563eb; /* blue-600 to indicate it's clickable */
+            color: #2563eb; 
             text-decoration: underline;
             text-decoration-style: dotted;
         }
          .truncate-text:hover {
-            color: #1d4ed8; /* darker blue on hover */
+            color: #1d4ed8; 
         }
-        /* Style for clickable locations */
-        .location-link {
+        /* Style for clickable links (locations, event links) */
+        .clickable-link {
             color: #2563eb; /* Tailwind blue-600 */
             text-decoration: underline;
         }
-        .location-link:hover {
+        .clickable-link:hover {
             color: #1d4ed8; /* Tailwind blue-700 */
         }
 
         /* Modal styles */
         .modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1000; /* Sit on top */
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.5); 
         }
         .modal-content {
             background-color: #fefefe;
-            margin: 10% auto; /* 10% from the top and centered */
+            margin: 10% auto; 
             padding: 25px;
             border: 1px solid #888;
-            width: 80%; /* Could be more or less, depending on screen size */
-            max-width: 600px; /* Maximum width */
+            width: 80%; 
+            max-width: 600px; 
             border-radius: 0.5rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
@@ -131,7 +131,7 @@
         .modal-body {
             padding-top:15px;
             padding-bottom: 15px;
-            white-space: pre-wrap; /* Preserve line breaks from CSV */
+            white-space: pre-wrap; 
         }
         .modal-footer {
             padding-top: 10px;
@@ -139,7 +139,7 @@
             text-align: right;
         }
         .close-button {
-            background-color: #ef4444; /* red-500 */
+            background-color: #ef4444; 
             color: white;
             padding: 0.5rem 1rem;
             border: none;
@@ -148,7 +148,7 @@
             transition: background-color 0.2s;
         }
         .close-button:hover {
-            background-color: #dc2626; /* red-600 */
+            background-color: #dc2626; 
         }
     </style>
 </head>
@@ -157,16 +157,17 @@
     <div class="container mx-auto max-w-7xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Interactive Event Schedule</h1>
-            <p class="text-gray-600 mt-2">Browse, search, and sort events. Filter by weekday. Click on descriptions or locations for more info.</p>
+            <p class="text-gray-600 mt-2">Browse, search, and sort events. Filter by weekday. Click on descriptions, locations, or event links for more info.</p>
         </header>
 
         <div id="instructions" class="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
             <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
             <ol class="list-decimal list-inside space-y-2 text-gray-700">
-                <li>Ensure `folkemoedet_events.csv` is in the same folder as this HTML file.</li>
-                <li>Use the buttons to filter by weekday.</li>
-                <li>Click on any event description that ends with "..." to see the full details in a pop-up.</li>
-                <li>Click on a location to see it on the official Folkemødet program map (opens in a new tab).</li>
+                <li>Ensure `folkemoedet_events.csv` (with the new "Event Link" column) is in the same folder.</li>
+                <li>Use buttons to filter by weekday.</li>
+                <li>Click descriptions ending with "..." for full details in a pop-up.</li>
+                <li>Click a location to see it on the official Folkemødet program map (new tab).</li>
+                <li>Click "View Event" in the "Event Link" column if a link is available (new tab).</li>
             </ol>
         </div>
         
@@ -211,12 +212,11 @@
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
         $(document).ready(function() {
-            const csvFilePath = 'folkemoedet_events.csv';
+            const csvFilePath = 'folkemoedet_events.csv'; // Ensure this CSV has the new "Event Link" column
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
             let eventDataTable = null;
-            let originalData = []; // To store full data for modal
+            let originalData = []; 
 
-            // Modal elements
             const modal = document.getElementById('descriptionModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalFullDescription = document.getElementById('modalFullDescription');
@@ -255,7 +255,7 @@
                 .then(response => {
                     if (!response.ok) {
                         let errorDetail = `HTTP error! Status: ${response.status}.`;
-                        if (response.status === 404) { errorDetail += ` File '${csvFilePath}' not found.`; }
+                        if (response.status === 404) { errorDetail += ` File '${csvFilePath}' not found. Ensure it includes the 'Event Link' column.`; }
                         throw new Error(errorDetail);
                     }
                     return response.text();
@@ -266,10 +266,16 @@
                     originalData = parsed.data; 
                     const headers = parsed.headers;
 
-                    if (headers.length === 0 ) {
-                        const message = `Could not parse CSV headers from '${csvFilePath}'.`;
+                    // Expected headers: Weekday,Time,Location,Event Description,Comments (Responsible/Organizer),Source Document,Event Link
+                    // Column indices:    0      1       2           3                        4                                  5                6
+                    const locationColIndex = headers.indexOf("Location"); // Should be 2
+                    const descriptionColIndex = headers.indexOf("Event Description"); // Should be 3
+                    const eventLinkColIndex = headers.indexOf("Event Link"); // Should be 6
+
+                    if (headers.length === 0 || descriptionColIndex === -1 || locationColIndex === -1 || eventLinkColIndex === -1) {
+                        const message = `Could not parse CSV headers correctly, or essential columns (Location, Event Description, Event Link) are missing from '${csvFilePath}'.`;
                         tableErrorMessageDiv.textContent = message; tableErrorMessageDiv.classList.remove('hidden');
-                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not display data.</td></tr></tbody>');
+                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not display data due to missing columns.</td></tr></tbody>');
                         return;
                     }
                     
@@ -289,33 +295,40 @@
                         order: [[0, 'asc']], 
                         columnDefs: [ 
                             { width: '10%', targets: 0 }, // Weekday
-                            { width: '15%', targets: 1 }, // Time
-                            { // Location column (assuming it's the 3rd column, index 2)
-                              targets: 2, // IMPORTANT: Adjust if your "Location" is a different column
+                            { width: '12%', targets: 1 }, // Time
+                            { // Location column
+                              targets: locationColIndex, 
                               render: function (data, type, row, meta) {
                                 if (type === 'display' && data) {
                                     const baseUrl = "https://programoversigt.folkemoedet.dk/";
-                                    // Basic encoding, consider more robust if special characters are complex
                                     const encodedLocation = encodeURIComponent(data);
-                                    return `<a href="${baseUrl}?location=${encodedLocation}" target="_blank" class="location-link" title="View ${data} on Folkemødet map">${data}</a>`;
+                                    return `<a href="${baseUrl}?location=${encodedLocation}" target="_blank" class="clickable-link" title="View ${data} on Folkemødet map">${data}</a>`;
                                 }
                                 return data;
                               }
                             },
-                            { // Event Description column (assuming it's the 4th column, index 3)
-                              targets: 3, // IMPORTANT: Adjust if your "Event Description" is a different column
+                            { // Event Description column
+                              targets: descriptionColIndex, 
                               render: function (data, type, row, meta) {
                                 if (type === 'display') {
-                                    const fullText = row[3]; 
+                                    const fullText = row[descriptionColIndex]; 
                                     const maxLength = 50; 
                                     if (fullText && fullText.length > maxLength) {
-                                        // Escape quotes for the data-fulltext attribute
                                         const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                                         return `<span class="truncate-text" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`;
                                     }
                                     return data; 
                                 }
                                 return data;
+                              }
+                            },
+                            { // Event Link column
+                              targets: eventLinkColIndex,
+                              render: function(data, type, row, meta) {
+                                if (type === 'display' && data && (data.startsWith('http://') || data.startsWith('https://'))) {
+                                    return `<a href="${data}" target="_blank" class="clickable-link" title="View official event program">View Event</a>`;
+                                }
+                                return '-'; // Show a dash if no link or not a valid http(s) link
                               }
                             }
                         ]
@@ -342,38 +355,26 @@
             $('#eventTable tbody').on('click', 'span.truncate-text', function () {
                 const fullText = $(this).data('fulltext');
                 const rowData = eventDataTable.row($(this).closest('tr')).data(); 
-                // Assuming event name/title for modal is in rowData[2] (Location) or use a generic title
-                // For description modal, let's use the description itself or a generic "Event Description" title.
-                // The actual "Event Description" is rowData[3]
-                let eventTitleForRow = "Event Details"; // Default modal title
-                if (rowData && rowData.length > 2 && rowData[2]) { // Check if there's content in column 2 (Location)
-                    // Attempt to find a more descriptive title from another column if needed
-                    // For now, using "Event Details" or you could try to extract a short title from rowData[3] (the description itself)
-                     // or rowData[2] if that's more like a title in your CSV.
-                     // Let's assume for now column 2 (Location) might serve as a part of the title or context.
-                     // If the actual event title is in a specific column, use that index.
-                     // The provided CSV has: Weekday, Time, Location, Event Description
-                     // So, rowData[2] is Location, rowData[3] is Event Description.
-                     // Let's use the first few words of the description as a title if nothing else is better.
-                     const descFirstPart = rowData[3] ? rowData[3].substring(0,30) + "..." : "Event Details";
-                     modalTitle.textContent = descFirstPart;
-                } else {
-                    modalTitle.textContent = "Event Details";
+                const descriptionColIndex = eventDataTable.column('Event Description:name').index(); // Get by name if DT supports named columns
+                const locationColIndex = eventDataTable.column('Location:name').index();
+
+                let eventTitleForRow = "Event Details"; 
+                // Use a more reliable way to get column index if headers are fixed
+                // Assuming CSV headers: Weekday,Time,Location,Event Description,...
+                // rowData[descriptionColIndex] should be the description itself.
+                // rowData[locationColIndex] is the location. Let's use Location as part of the title.
+                if (rowData && rowData.length > 2 && rowData[2]) { // rowData[2] is Location
+                     eventTitleForRow = rowData[2]; // Use Location as the primary part of the title
                 }
                 
+                modalTitle.textContent = eventTitleForRow + " - Details";
                 modalFullDescription.textContent = fullText;
                 modal.style.display = "block";
             });
 
             // Modal close functionality
-            closeModalButton.onclick = function() {
-                modal.style.display = "none";
-            }
-            window.onclick = function(event) { // Close if clicked outside modal content
-                if (event.target == modal) {
-                    modal.style.display = "none";
-                }
-            }
+            closeModalButton.onclick = function() { modal.style.display = "none"; }
+            window.onclick = function(event) { if (event.target == modal) { modal.style.display = "none"; } }
         });
     </script>
 
