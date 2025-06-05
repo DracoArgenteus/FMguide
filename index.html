@@ -12,44 +12,12 @@
     <style>
         body { 
             font-family: 'Inter', sans-serif; 
-            margin: 0; /* Remove default body margin */
-            display: flex; /* Use flex for overall layout */
-            min-height: 100vh; /* Ensure body takes at least full viewport height */
-            background-color: #f3f4f6; /* Tailwind gray-100 for overall background */
-        }
-        .main-container { /* New wrapper for main content and side panel */
-            display: flex;
-            flex-grow: 1; /* Allows container to fill space */
-            width: 100%;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
         }
         .main-content { 
-            flex-grow: 1; 
             padding: 1rem; /* Tailwind p-4 */
-            overflow-y: auto; /* Allow main content to scroll independently if needed */
-            max-height: 100vh; /* Prevent main content from making page too tall for sticky panel to work */
         }
-        .side-panel {
-            width: 300px; 
-            min-width: 280px; /* Ensure it doesn't get too squished */
-            max-width: 350px;
-            padding: 1.5rem; /* Tailwind p-6 */
-            background-color: #f9fafb; /* Tailwind gray-50 */
-            border-left: 1px solid #e5e7eb; /* Tailwind gray-200 */
-            overflow-y: auto; /* Allow side panel content to scroll */
-            height: 100vh; /* Make side panel take full viewport height */
-            position: sticky; 
-            top: 0;
-            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out; /* Smooth transition for hiding/showing */
-        }
-        .side-panel.hidden-panel {
-            transform: translateX(100%); /* Slide out to the right */
-            width: 0;
-            min-width: 0;
-            padding: 0;
-            border-left: none;
-            overflow: hidden; /* Hide content when panel is collapsed */
-        }
-
+      
         /* DataTables and other existing styles */
         .dataTables_wrapper .dataTables_length,
         .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
@@ -95,107 +63,118 @@
         .close-button { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
         .close-button:hover { background-color: #dc2626; }
         #dataFreshness { font-size: 0.875rem; color: #4b5563; margin-top: -0.5rem; margin-bottom: 1rem; }
-        .chart-container { margin-bottom: 2rem; }
-        .chart-container h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+        
+        #statsSectionContainer {
+            background-color: #ffffff; /* Tailwind white */
+            padding: 1.5rem; /* Tailwind p-6 */
+            border-radius: 0.5rem; /* Tailwind rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* Tailwind shadow-lg */
+            transition: max-height 0.5s ease-in-out, opacity 0.5s ease-in-out, padding 0.5s ease-in-out;
+            overflow: hidden; /* Important for collapse transition */
+        }
+        #statsSectionContainer.hidden-stats {
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0 !important; /* Override mb-6 when hidden */
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Responsive grid */
+            gap: 1.5rem; /* Tailwind gap-6 */
+        }
+        .chart-wrapper {
+            /* Styles for individual chart containers if needed */
+            min-height: 300px; /* Ensure charts have some height */
+        }
+        .chart-wrapper h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: #374151; text-align: center;}
 
+        #toggleStatsButtonContainer {
+            margin-bottom: 1rem;
+            text-align: right; /* Position button to the right */
+        }
         #toggleStatsButton {
-            position: fixed;
-            top: 1rem; /* Tailwind top-4 */
-            right: 1rem; /* Tailwind right-4 */
-            z-index: 1050; /* Ensure it's above modal backdrop but potentially below open modal */
             background-color: #3b82f6; /* Tailwind blue-500 */
             color: white;
-            padding: 0.5rem 1rem; /* Tailwind p-2 px-4 */
-            border-radius: 0.375rem; /* Tailwind rounded-md */
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* Tailwind shadow-lg */
+            padding: 0.5rem 1rem; 
+            border-radius: 0.375rem; 
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
             cursor: pointer;
+            transition: background-color 0.2s;
         }
-        /* On smaller screens, we will hide the side panel by default and the button might be more prominent */
-        @media (max-width: 1024px) {
-            .main-container { flex-direction: column; }
-            .side-panel {
-                width: 100%; /* Full width when stacked */
-                max-height: none; /* Allow it to take needed height or a specific max if desired */
-                height: auto; /* Or specific like 50vh */
-                position: static; /* No longer sticky when stacked */
-                border-left: none;
-                border-top: 1px solid #e5e7eb;
-                transform: translateY(0); /* Reset transform for stacked view */
-            }
-            .side-panel.hidden-panel {
-                display: none; /* Simple hide for stacked view */
-            }
-            #toggleStatsButton {
-                /* Adjust button position for mobile if needed, or keep it fixed */
-            }
+        #toggleStatsButton:hover {
+            background-color: #2563eb; /* Tailwind blue-600 */
         }
 
     </style>
 </head>
 <body class="bg-gray-100">
-    <div class="main-container">
-        <div class="main-content">
-            <header class="mb-8 text-center">
-                <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
-                <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
-                <p class="text-gray-600 mt-2">Official and Private event lists. Use filters to browse.</p>
-            </header>
+    <div class="main-content">
+        <header class="mb-4 text-center"> <!-- Reduced bottom margin -->
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
+            <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
+            <p class="text-gray-600 mt-1">Official and Private event lists. Use filters to browse.</p> <!-- Reduced top margin -->
+        </header>
 
-            <button id="toggleStatsButton">Toggle Stats</button>
-
-            <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
-                <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
-                <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                    <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
-                    <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
-                    <li>Use the "Day" buttons to filter by weekday.</li>
-                    <li>Click on truncated descriptions or links for more details.</li>
-                    <li>Statistics in the side panel update based on your filters. Use "Toggle Stats" button.</li>
-                </ol>
-            </div>
-            
-            <div id="tableErrorMessage" class="hidden error-message"></div>
-
-            <div class="source-filter-buttons mb-4 text-center sm:text-left">
-                <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Source:</h3>
-                <button data-source="All" class="active-filter">All Sources</button>
-                <button data-source="Official">Official Program</button>
-                <button data-source="Private">Private List</button>
-            </div>
-
-            <div class="filter-buttons mb-6 text-center sm:text-left">
-                <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Day:</h3>
-                <button data-day="All" class="active-filter">All Days</button>
-                <button data-day="Torsdag">Torsdag</button>
-                <button data-day="Fredag">Fredag</button>
-                <button data-day="Lørdag">Lørdag</button>
-            </div>
-
-            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
-                <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-
-            <footer class="mt-12 text-center text-sm text-gray-500">
-                <p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer.</p>
-            </footer>
+        <div id="toggleStatsButtonContainer">
+            <button id="toggleStatsButton">Show Statistics</button>
         </div>
 
-        <div class="side-panel hidden-panel"> <!-- Start hidden on small screens, controlled by JS for large -->
-            <h3 class="text-xl font-bold text-blue-600 mb-4">Event Statistics</h3>
-            <div class="chart-container">
-                <h4>Events per Hour</h4>
-                <canvas id="eventsPerHourChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h4>Events per Theme (Top 10)</h4>
-                <canvas id="eventsPerThemeChart"></canvas>
+        <div id="statsSectionContainer" class="mb-6 hidden-stats"> <!-- Start hidden -->
+            <h3 class="text-xl font-bold text-blue-600 mb-4 text-center">Event Statistics</h3>
+            <div class="charts-grid">
+                <div class="chart-wrapper">
+                    <h4>Events per Hour</h4>
+                    <canvas id="eventsPerHourChart"></canvas>
+                </div>
+                <div class="chart-wrapper">
+                    <h4>Events per Theme (Top 10)</h4>
+                    <canvas id="eventsPerThemeChart"></canvas>
+                </div>
             </div>
         </div>
+
+
+        <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
+            <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
+            <ol class="list-decimal list-inside space-y-1 text-gray-700">
+                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
+                <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
+                <li>Use the "Day" buttons to filter by weekday.</li>
+                <li>Click on truncated descriptions or links for more details.</li>
+                <li>Statistics update based on your filters. Use "Show/Hide Statistics" button.</li>
+            </ol>
+        </div>
+        
+        <div id="tableErrorMessage" class="hidden error-message"></div>
+
+        <div class="source-filter-buttons mb-4 text-center sm:text-left">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Source:</h3>
+            <button data-source="All" class="active-filter">All Sources</button>
+            <button data-source="Official">Official Program</button>
+            <button data-source="Private">Private List</button>
+        </div>
+
+        <div class="filter-buttons mb-6 text-center sm:text-left">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Day:</h3>
+            <button data-day="All" class="active-filter">All Days</button>
+            <button data-day="Torsdag">Torsdag</button>
+            <button data-day="Fredag">Fredag</button>
+            <button data-day="Lørdag">Lørdag</button>
+        </div>
+
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
+            <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <footer class="mt-12 text-center text-sm text-gray-500">
+            <p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer.</p>
+        </footer>
     </div>
-
 
     <!-- Modal Structure -->
     <div id="descriptionModal" class="modal">
@@ -235,8 +214,9 @@
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
             const dataFreshnessElement = document.getElementById('dataFreshness');
-            const sidePanel = document.querySelector('.side-panel');
+            const statsSectionContainer = document.getElementById('statsSectionContainer');
             const toggleStatsButton = document.getElementById('toggleStatsButton');
+
             let eventDataTable = null;
             let allNormalizedEvents = []; 
 
@@ -249,6 +229,7 @@
             let eventsPerThemeChartInstance = null;
 
             function robustParseCSV(csvText) {
+                // ... (robustParseCSV function from previous version - unchanged)
                 const data = []; let headers = [];
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 const lines = []; let inQuotes = false; let currentLine = "";
@@ -313,6 +294,7 @@
                 if (i > 1) return Math.floor(i) + " minutes ago"; return Math.floor(s) + " seconds ago";
             }
 
+
             function normalizeData(rawData, sourceName, map) {
                 return rawData.map((rawEvent, index) => { 
                     const normalizedEvent = { DataSource: sourceName }; 
@@ -327,7 +309,6 @@
                         }
                         ['_FullDate','_StartTime','_EndTime','_OfficialYear','_OfficialCrmId','_OfficialSlug'].forEach(k=>delete normalizedEvent[k]);
                     }
-                    // if (index < 1) console.log(`Normalized ${sourceName} sample:`, JSON.parse(JSON.stringify(normalizedEvent)));
                     return normalizedEvent;
                 });
             }
@@ -358,7 +339,7 @@
                     columnDefs: [ 
                         { width: '8%', targets: colIdx.Weekday }, { width: '8%', targets: colIdx.TimeRange },
                         { width: '15%', targets: colIdx.Location, render: (d,t) => (t==='display'&&d)?`<a href="https://programoversigt.folkemoedet.dk/?location=${encodeURIComponent(d)}" target="_blank" class="clickable-link" title="View ${d} on map">${d}</a>`:d },
-                        { width: '25%', targets: colIdx.Description, render: (d,t) => { if(t==='display'&&d){const m=45; if(d.length>m) return `<span class="truncate-text" title="Click to read more" data-fulltext="${d.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${d.substring(0,m)}...</span>`;} return d||'';}},
+                        { width: '25%', targets: colIdx.Description, render: (d,t) => { if(t==='display'&&d){const m=40; if(d.length>m) return `<span class="truncate-text" style="max-width:200px;" title="Click to read more" data-fulltext="${d.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${d.substring(0,m)}...</span>`;} return d||'';}},
                         { width: '10%', targets: colIdx.EventURL, render: (d,t) => (t==='display'&&d&&(d.startsWith('http://')||d.startsWith('https://')))?`<a href="${d}" target="_blank" class="clickable-link">View Event</a>`:d||'' },
                         { width: '10%', targets: colIdx.DataSource, className: "dt-body-center" },
                         { width: '14%', targets: colIdx.Organizers }, { width: '10%', targets: colIdx.Theme }
@@ -369,13 +350,11 @@
 
             let currentSourceFilter = "All", currentDayFilter = "All";
             function applyFilters() {
-                if(!eventDataTable) return; console.log(`Applying filters - Src:${currentSourceFilter}, Day:${currentDayFilter}`);
+                if(!eventDataTable) return; 
                 const dsIdx=UNIFIED_HEADERS.indexOf("DataSource"), wdIdx=UNIFIED_HEADERS.indexOf("Weekday");
                 if(dsIdx===-1||wdIdx===-1) { console.error("Col index error."); return; }
-                // if(eventDataTable.rows().count()>0) console.log("DEBUG: Unique DataSources:", eventDataTable.column(dsIdx).data().unique().toArray());
                 eventDataTable.column(dsIdx).search(currentSourceFilter==="All"?'':'^'+currentSourceFilter+'$',true,false,true).draw(false);
                 eventDataTable.column(wdIdx).search(currentDayFilter==="All"?'':'^'+currentDayFilter+'$',true,false,true).draw();
-                // console.log("Table redrawn. Matching:", eventDataTable.rows({search:'applied'}).count());
             }
             $('.source-filter-buttons button').on('click', function(){ currentSourceFilter=$(this).data('source'); $('.source-filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
             $('.filter-buttons button').on('click', function(){ currentDayFilter=$(this).data('day'); $('.filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
@@ -383,47 +362,43 @@
             closeModalButton.onclick=()=>modal.style.display="none"; window.onclick=(e)=>{if(e.target==modal)modal.style.display="none";}
 
             function initializeCharts() {
-                const hctx = document.getElementById('eventsPerHourChart').getContext('2d');
-                eventsPerHourChartInstance = new Chart(hctx, {type:'bar',data:{labels:[],datasets:[{label:'Events/Hour',data:[],backgroundColor:'rgba(54,162,235,0.7)',borderColor:'rgba(54,162,235,1)',borderWidth:1}]},options:{scales:{y:{beginAtZero:true,ticks:{stepSize:1}}},responsive:true,maintainAspectRatio:false}});
-                const tctx = document.getElementById('eventsPerThemeChart').getContext('2d');
-                eventsPerThemeChartInstance = new Chart(tctx, {type:'bar',data:{labels:[],datasets:[{label:'Events/Theme',data:[],backgroundColor:'rgba(75,192,192,0.7)',borderColor:'rgba(75,192,192,1)',borderWidth:1}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{stepSize:1}}},responsive:true,maintainAspectRatio:false}});
+                const hctx = document.getElementById('eventsPerHourChart');
+                const tctx = document.getElementById('eventsPerThemeChart');
+                if (!hctx || !tctx) { console.warn("Chart canvas elements not found!"); return; }
+
+                eventsPerHourChartInstance = new Chart(hctx.getContext('2d'), {type:'bar',data:{labels:[],datasets:[{label:'Events/Hour',data:[],backgroundColor:'rgba(54,162,235,0.7)',borderColor:'rgba(54,162,235,1)',borderWidth:1}]},options:{scales:{y:{beginAtZero:true,ticks:{stepSize:1, precision:0}}},responsive:true,maintainAspectRatio:true}});
+                eventsPerThemeChartInstance = new Chart(tctx.getContext('2d'), {type:'bar',data:{labels:[],datasets:[{label:'Events/Theme',data:[],backgroundColor:'rgba(75,192,192,0.7)',borderColor:'rgba(75,192,192,1)',borderWidth:1}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{stepSize:1, precision:0}}},responsive:true,maintainAspectRatio:true}});
             }
             function updateVisualizations() {
                 if(!eventDataTable||!eventsPerHourChartInstance||!eventsPerThemeChartInstance) return;
                 const fData = eventDataTable.rows({search:'applied'}).data().toArray();
                 const trIdx=UNIFIED_HEADERS.indexOf("TimeRange"), thIdx=UNIFIED_HEADERS.indexOf("Theme");
-                const hrCnt={}; for(let i=0;i<24;i++)hrCnt[i.toString().padStart(2,'0')]=0;
+                const hrCnt={}; for(let i=6;i<24;i++)hrCnt[i.toString().padStart(2,'0')]=0; // Initialize hours from 06 to 23
                 fData.forEach(r=>{const tr=r[trIdx];if(tr){const sm=tr.match(/^(\d{2}):\d{2}/);if(sm)if(hrCnt.hasOwnProperty(sm[1]))hrCnt[sm[1]]++;}});
-                eventsPerHourChartInstance.data.labels=Object.keys(hrCnt); eventsPerHourChartInstance.data.datasets[0].data=Object.values(hrCnt); eventsPerHourChartInstance.update();
-                const thCnt={}; fData.forEach(r=>{const th=r[thIdx]?r[thIdx].trim():"N/A";if(th)thCnt[th]=(thCnt[th]||0)+1;});
+                eventsPerHourChartInstance.data.labels=Object.keys(hrCnt).sort(); eventsPerHourChartInstance.data.datasets[0].data=Object.keys(hrCnt).sort().map(key => hrCnt[key]); eventsPerHourChartInstance.update();
+                
+                const thCnt={}; fData.forEach(r=>{const th=r[thIdx]?r[thIdx].trim():"N/A";if(th&&th!=="N/A"&&th.trim()!=='')thCnt[th]=(thCnt[th]||0)+1;}); // Exclude "N/A" and empty themes
                 const sThemes=Object.entries(thCnt).sort(([,a],[,b])=>b-a).slice(0,10);
                 eventsPerThemeChartInstance.data.labels=sThemes.map(e=>e[0]); eventsPerThemeChartInstance.data.datasets[0].data=sThemes.map(e=>e[1]); eventsPerThemeChartInstance.update();
-                // console.log("Visualizations updated.");
             }
 
-            // Sidebar Toggle Logic
-            if (toggleStatsButton && sidePanel) {
-                 // Default state on larger screens: Show panel. Hide on smaller.
-                if (window.innerWidth <= 1024) {
-                    sidePanel.classList.add('hidden-panel'); // Start hidden on mobile
-                } else {
-                    sidePanel.classList.remove('hidden-panel'); // Start visible on desktop
-                }
+            // Toggle Stats Section Logic
+            if (toggleStatsButton && statsSectionContainer) {
+                statsSectionContainer.classList.add('hidden-stats'); // Start hidden
+                toggleStatsButton.textContent = "Show Statistics";
 
                 toggleStatsButton.addEventListener('click', () => {
-                    sidePanel.classList.toggle('hidden-panel');
-                    // Optional: you might need to tell DataTables/Charts to resize/redraw if panel visibility changes layout significantly
-                    if (!sidePanel.classList.contains('hidden-panel')) {
-                        setTimeout(() => { // Give a moment for panel to animate
+                    const isHidden = statsSectionContainer.classList.toggle('hidden-stats');
+                    toggleStatsButton.textContent = isHidden ? "Show Statistics" : "Hide Statistics";
+                    if (!isHidden) { // If showing
+                        setTimeout(() => { 
                             if (eventsPerHourChartInstance) eventsPerHourChartInstance.resize();
                             if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.resize();
-                        }, 350); // Should match transition duration
+                            updateVisualizations(); // Ensure charts are drawn with current data
+                        }, 50); // Short delay for container to be visible for resize
                     }
                 });
-            } else {
-                console.warn("Toggle button or side panel not found.");
             }
-
         });
     </script>
 </body>
