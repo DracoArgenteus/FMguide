@@ -43,7 +43,7 @@
         }
 
         .truncate-text {
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* max-width is now controlled by columnDef */
             cursor: pointer; color: #2563eb; text-decoration: underline; text-decoration-style: dotted;
         }
         .truncate-text:hover { color: #1d4ed8; }
@@ -142,7 +142,6 @@
         };
 
         $(document).ready(function() {
-            // Use the filename you specified
             const privateCsvPath = 'data/folkemoedet_private_events.csv'; 
             const officialCsvPath = 'data/official_events_combined.csv';
             
@@ -375,17 +374,19 @@
                             } return data;
                           }
                         },
-                        { width: '30%', targets: colIdx.Description, 
-                          render: function (data, type, row, meta) {
-                            if (type === 'display' && data) {
-                                const fullText = data; 
-                                const maxLength = 60; 
-                                if (fullText.length > maxLength) {
-                                    const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                                    return `<span class="truncate-text" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`;
-                                }
-                            } return data || ''; 
-                          }
+                        { 
+                            width: '20%', // Adjusted width for Description column
+                            targets: colIdx.Description, 
+                            render: function (data, type, row, meta) {
+                                if (type === 'display' && data) {
+                                    const fullText = data; 
+                                    const maxLength = 40; // Max characters to show in table (can be adjusted)
+                                    if (fullText.length > maxLength) {
+                                        const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                        return `<span class="truncate-text" style="max-width: 200px;" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; // Inline max-width for span if needed
+                                    }
+                                } return data || ''; 
+                            }
                         },
                         { targets: colIdx.EventURL,
                           render: function(data, type, row, meta) {
