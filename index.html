@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folkemødet 2025 - Interactive Event Schedule</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <!-- DataTables JS -->
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <style>
+        /* Custom styles for better readability and DataTables integration with Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter,
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate {
+            margin-bottom: 1rem; /* Add some space around DataTables controls */
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            border: 1px solid #cbd5e1; /* gray-300 */
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem 0.75rem; /* py-2 px-3 */
+            margin-left: 0.5rem;
+        }
+        .dataTables_wrapper .dataTables_length select {
+            border: 1px solid #cbd5e1; /* gray-300 */
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem 2.5rem 0.5rem 0.75rem; /* py-2 pr-10 pl-3 */
+            margin-left: 0.5rem;
+            margin-right: 0.5rem;
+        }
+        /* Style for table headers */
+        table.dataTable th {
+            background-color: #f3f4f6; /* bg-gray-100 */
+            color: #1f2937; /* text-gray-800 */
+        }
+        /* Ensure table fits well on smaller screens */
+        .table-container {
+            overflow-x: auto; /* Allows horizontal scrolling for the table on small screens */
+        }
+        #eventTable {
+            width: 100% !important; /* Ensure DataTables takes full width */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8">
+
+    <div class="container mx-auto max-w-7xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Interactive Event Schedule</h1>
+            <p class="text-gray-600 mt-2">Browse, search, and sort events. Default view is sorted by Weekday.</p>
+        </header>
+
+        <div id="instructions" class="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
+            <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page with Your Data</h2>
+            <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                <li>Save the CSV data (provided in the other artifact, now with fuller descriptions) into a file named `folkemoedet_events.csv`.</li>
+                <li>Place this HTML file and the `folkemoedet_events.csv` file in the same folder.</li>
+                <li>
+                    <strong>For GitHub Pages:</strong>
+                    <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                        <li>Create a new public repository on GitHub.</li>
+                        <li>Upload this HTML file (e.g., as `index.html`) and the `folkemoedet_events.csv` file to the root of that repository.</li>
+                        <li>Go to your repository's "Settings" page.</li>
+                        <li>Scroll down to the "Pages" section in the left sidebar.</li>
+                        <li>Under "Branch", select your main branch (usually `main` or `master`) and `/ (root)` folder, then click "Save".</li>
+                        <li>GitHub will provide you with a URL (e.g., `https://your-username.github.io/your-repository-name/`) where your interactive table will be live. It might take a few minutes for the site to be deployed.</li>
+                    </ul>
+                </li>
+                <li>If you open this HTML file directly in your browser from your local file system, it should also work, fetching the local CSV file.</li>
+            </ol>
+            <p class="mt-4 text-sm text-blue-600"><strong>Note on Pivot Tables:</strong> This setup provides robust sorting, searching, and pagination. True pivot table functionality directly from a static CSV on the client-side is more advanced. For that, you might explore libraries like <a href="https://webdatarocks.com/" target="_blank" class="underline hover:text-blue-800">WebDataRocks</a> (has free tier) or <a href="https://www.ag-grid.com/" target="_blank" class="underline hover:text-blue-800">ag-Grid</a> (community version is free), which offer more complex data manipulation capabilities but might have a steeper learning curve or different integration methods.</p>
+        </div>
+
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
+            <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
+                <thead>
+                    <!-- Table headers will be dynamically generated from CSV -->
+                </thead>
+                <tbody>
+                    <!-- Table body will be dynamically populated from CSV -->
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="mt-12 text-center text-sm text-gray-500">
+            <p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer. Data processed from supplied documents.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Set current year in footer
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        $(document).ready(function() {
+            // Path to your CSV file - ensure this matches the filename you use.
+            const csvFilePath = 'folkemoedet_events.csv';
+
+            // Enhanced CSV parsing function to handle commas within quoted fields
+            function robustParseCSV(csvText) {
+                const lines = csvText.trim().split('\\n');
+                if (lines.length === 0) return { headers: [], data: [] };
+
+                // Function to split a CSV line considering quotes
+                const splitCsvLine = (line) => {
+                    const result = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"') { // Handles escaped quotes "" inside a quoted field by toggling
+                            if (i + 1 < line.length && line[i+1] === '"') {
+                                current += '"'; // Add one quote and skip the next one
+                                i++;
+                            } else {
+                                inQuotes = !inQuotes;
+                            }
+                        } else if (char === ',' && !inQuotes) {
+                            result.push(current.trim()); // No need to .replace(/^"|"$/g, '') here as we handle quotes directly
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    result.push(current.trim()); // Add the last field
+                    // Clean leading/trailing quotes from each field AFTER splitting
+                    return result.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
+                };
+                
+                const headers = splitCsvLine(lines[0]);
+                const data = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].trim() === "") continue; // Skip empty lines
+                    const values = splitCsvLine(lines[i]);
+                    if (values.length === headers.length) {
+                        let row = {};
+                        headers.forEach((header, index) => {
+                            row[header] = values[index];
+                        });
+                        data.push(row);
+                    } else {
+                        console.warn("Skipping malformed CSV line:", lines[i], "Expected", headers.length, "fields, got", values.length, "Values:", values);
+                    }
+                }
+                return { headers, data };
+            }
+
+
+            fetch(csvFilePath)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status} - Could not load ${csvFilePath}. Make sure the file exists in the same directory as this HTML file, and the filename is correct.`);
+                    }
+                    return response.text();
+                })
+                .then(csvText => {
+                    const { headers, data } = robustParseCSV(csvText);
+
+                    if (headers.length === 0) {
+                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not parse CSV headers. Check CSV format and file path.</td></tr></tbody>');
+                        return;
+                    }
+                    
+                    // Dynamically create table headers
+                    let headerHtml = '<tr>';
+                    headers.forEach(header => {
+                        headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`;
+                    });
+                    headerHtml += '</tr>';
+                    $('#eventTable thead').html(headerHtml);
+
+                    // Prepare data for DataTables (array of arrays)
+                    const dataSet = data.map(row => headers.map(header => row[header]));
+
+                    // Initialize DataTables
+                    $('#eventTable').DataTable({
+                        data: dataSet,
+                        responsive: true,
+                        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                        pageLength: 10,
+                        language: {
+                            search: "_INPUT_",
+                            searchPlaceholder: "Search events...",
+                            lengthMenu: "Show _MENU_ entries"
+                        },
+                        order: [[0, 'asc']], // Sort by the first column (Weekday) in ascending order
+                        columnDefs: [ // Making specific columns less wide if they tend to be short
+                            { width: '10%', targets: 0 }, // Weekday
+                            { width: '15%', targets: 1 }  // Time
+                        ]
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching or parsing CSV:', error);
+                    $('#eventTable').html(`<thead><tr><th>Error</th></tr></thead><tbody><tr><td>${error.message}</td></tr></tbody>`);
+                });
+        });
+    </script>
+
+</body>
+</html>
