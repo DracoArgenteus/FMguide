@@ -91,6 +91,14 @@
          .truncate-text:hover {
             color: #1d4ed8; /* darker blue on hover */
         }
+        /* Style for clickable locations */
+        .location-link {
+            color: #2563eb; /* Tailwind blue-600 */
+            text-decoration: underline;
+        }
+        .location-link:hover {
+            color: #1d4ed8; /* Tailwind blue-700 */
+        }
 
         /* Modal styles */
         .modal {
@@ -149,7 +157,7 @@
     <div class="container mx-auto max-w-7xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Interactive Event Schedule</h1>
-            <p class="text-gray-600 mt-2">Browse, search, and sort events. Filter by weekday. Click on truncated descriptions to read more.</p>
+            <p class="text-gray-600 mt-2">Browse, search, and sort events. Filter by weekday. Click on descriptions or locations for more info.</p>
         </header>
 
         <div id="instructions" class="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
@@ -157,7 +165,8 @@
             <ol class="list-decimal list-inside space-y-2 text-gray-700">
                 <li>Ensure `folkemoedet_events.csv` is in the same folder as this HTML file.</li>
                 <li>Use the buttons to filter by weekday.</li>
-                <li>Click on any event description that ends with "..." to see the full details.</li>
+                <li>Click on any event description that ends with "..." to see the full details in a pop-up.</li>
+                <li>Click on a location to see it on the official Folkemødet program map (opens in a new tab).</li>
             </ol>
         </div>
         
@@ -254,9 +263,8 @@
                 .then(csvText => {
                     tableErrorMessageDiv.classList.add('hidden');
                     const parsed = robustParseCSV(csvText);
-                    originalData = parsed.data; // Store original data with full descriptions
+                    originalData = parsed.data; 
                     const headers = parsed.headers;
-
 
                     if (headers.length === 0 ) {
                         const message = `Could not parse CSV headers from '${csvFilePath}'.`;
@@ -282,20 +290,30 @@
                         columnDefs: [ 
                             { width: '10%', targets: 0 }, // Weekday
                             { width: '15%', targets: 1 }, // Time
-                            { // Event Description column (assuming it's the 3rd column, index 2)
+                            { // Location column (assuming it's the 3rd column, index 2)
+                              targets: 2, // IMPORTANT: Adjust if your "Location" is a different column
+                              render: function (data, type, row, meta) {
+                                if (type === 'display' && data) {
+                                    const baseUrl = "https://programoversigt.folkemoedet.dk/";
+                                    // Basic encoding, consider more robust if special characters are complex
+                                    const encodedLocation = encodeURIComponent(data);
+                                    return `<a href="${baseUrl}?location=${encodedLocation}" target="_blank" class="location-link" title="View ${data} on Folkemødet map">${data}</a>`;
+                                }
+                                return data;
+                              }
+                            },
+                            { // Event Description column (assuming it's the 4th column, index 3)
                               targets: 3, // IMPORTANT: Adjust if your "Event Description" is a different column
                               render: function (data, type, row, meta) {
                                 if (type === 'display') {
-                                    // Store full data in a data attribute for easy retrieval
-                                    // The 'data' here is the content of the cell
-                                    // We need the original full description which might be the same 'data'
-                                    // or from the originalData array if truncation happened before DataTables
-                                    const fullText = row[3]; // Assuming description is the 4th item in the row array
-                                    const maxLength = 50; // Max characters to show in table
+                                    const fullText = row[3]; 
+                                    const maxLength = 50; 
                                     if (fullText && fullText.length > maxLength) {
-                                        return `<span class="truncate-text" title="Click to read more" data-fulltext="${fullText.replace(/"/g, '&quot;')}">${fullText.substring(0, maxLength)}...</span>`;
+                                        // Escape quotes for the data-fulltext attribute
+                                        const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                        return `<span class="truncate-text" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`;
                                     }
-                                    return data; // data is already the full text if not long
+                                    return data; 
                                 }
                                 return data;
                               }
@@ -320,16 +338,29 @@
                 }
             });
 
-            // Modal open functionality
+            // Modal open functionality for descriptions
             $('#eventTable tbody').on('click', 'span.truncate-text', function () {
                 const fullText = $(this).data('fulltext');
-                // Try to get a title from the same row, e.g., event name or a generic title
-                // This assumes the "Event Description" is column index 3.
-                // The row data can be accessed via DataTables API if needed, but this is simpler.
                 const rowData = eventDataTable.row($(this).closest('tr')).data(); 
-                // Assuming event name/title might be in column 2 (index 2 of rowData)
-                // Adjust this if your event title is in a different column
-                modalTitle.textContent = rowData[2] || "Event Details"; 
+                // Assuming event name/title for modal is in rowData[2] (Location) or use a generic title
+                // For description modal, let's use the description itself or a generic "Event Description" title.
+                // The actual "Event Description" is rowData[3]
+                let eventTitleForRow = "Event Details"; // Default modal title
+                if (rowData && rowData.length > 2 && rowData[2]) { // Check if there's content in column 2 (Location)
+                    // Attempt to find a more descriptive title from another column if needed
+                    // For now, using "Event Details" or you could try to extract a short title from rowData[3] (the description itself)
+                     // or rowData[2] if that's more like a title in your CSV.
+                     // Let's assume for now column 2 (Location) might serve as a part of the title or context.
+                     // If the actual event title is in a specific column, use that index.
+                     // The provided CSV has: Weekday, Time, Location, Event Description
+                     // So, rowData[2] is Location, rowData[3] is Event Description.
+                     // Let's use the first few words of the description as a title if nothing else is better.
+                     const descFirstPart = rowData[3] ? rowData[3].substring(0,30) + "..." : "Event Details";
+                     modalTitle.textContent = descFirstPart;
+                } else {
+                    modalTitle.textContent = "Event Details";
+                }
+                
                 modalFullDescription.textContent = fullText;
                 modal.style.display = "block";
             });
