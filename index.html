@@ -53,7 +53,7 @@
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 10% auto; padding: 25px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
         .modal-header { padding-bottom: 10px; border-bottom: 1px solid #eee; font-size: 1.25rem; font-weight: 600; }
-        .modal-body { padding-top:15px; padding-bottom: 15px; white-space: pre-wrap; } /* pre-wrap helps render newlines */
+        .modal-body { padding-top:15px; padding-bottom: 15px; white-space: pre-wrap; } 
         .modal-footer { padding-top: 10px; border-top: 1px solid #eee; text-align: right; }
         .close-button { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
         .close-button:hover { background-color: #dc2626; }
@@ -70,7 +70,7 @@
         <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
             <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
             <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                <li>Ensure `data/folkemoedet_private_events.csv` (use v2 when provided) and `data/official_events_combined.csv` exist.</li>
+                <li>Ensure `data/folkemoedet_private_events_v2.csv` and `data/official_events_combined.csv` exist.</li>
                 <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
                 <li>Use the "Day" buttons to filter by weekday.</li>
                 <li>Click on truncated descriptions or links for more details.</li>
@@ -126,9 +126,10 @@
         ];
         
         const privateDataMap = {
-            "EventTitle": "EventTitle", "Weekday": "Weekday", "Time": "TimeRange", "Location": "Location",
-            "EventDescription": "Description", "EventLink": "EventURL", 
-            "ResponsibleOrganizer": "Organizers", "SourceDocument": "OriginalSourceDoc" 
+            "EventTitle": "EventTitle", "Weekday": "Weekday", "TimeRange": "TimeRange", "Location": "Location", // Time was already TimeRange in the new CSV
+            "Description": "Description", "EventURL": "EventURL", 
+            "Organizers": "Organizers", "Theme": "Theme", 
+            "DataSource": "DataSource", "OriginalSourceDoc": "OriginalSourceDoc"
         };
 
         const officialDataMap = {
@@ -139,7 +140,8 @@
         };
 
         $(document).ready(function() {
-            const privateCsvPath = 'data/folkemoedet_private_events.csv'; // Will be v2 later
+            // CORRECTED FILE PATH FOR PRIVATE EVENTS
+            const privateCsvPath = 'data/folkemoedet_private_events_v2.csv'; 
             const officialCsvPath = 'data/official_events_combined.csv';
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
@@ -154,15 +156,7 @@
             function robustParseCSV(csvText) {
                 const data = [];
                 let headers = [];
-                // Normalize line endings
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                
-                // Regex to split CSV rows, correctly handling newlines within quoted fields
-                // This regex looks for a newline character that is NOT preceded by an odd number of quotes
-                // (meaning it's not inside a properly quoted field).
-                // This is a simplification; truly robust CSV parsing for all edge cases is complex.
-                // A common approach is to find a delimiter (,) that is not inside quotes.
-                
                 const lines = [];
                 let inQuotes = false;
                 let currentLine = "";
@@ -170,10 +164,8 @@
                     const char = normalizedCsvText[i];
                     currentLine += char;
                     if (char === '"') {
-                        // Handle "" as an escaped quote inside a field
                         if (i + 1 < normalizedCsvText.length && normalizedCsvText[i+1] === '"') {
-                            currentLine += '"'; // Add the second quote
-                            i++; // Skip the next quote
+                            currentLine += '"'; i++;
                         } else {
                             inQuotes = !inQuotes;
                         }
@@ -182,51 +174,33 @@
                         currentLine = "";
                     }
                 }
-                if (currentLine.trim()) { // Add the last line if any
-                    lines.push(currentLine.trim());
-                }
-
+                if (currentLine.trim()) { lines.push(currentLine.trim()); }
                 if (lines.length === 0) return { headers, data };
 
-                // Function to split a single CSV line into fields, respecting quotes
                 const splitCsvFields = (line) => {
-                    const fields = [];
-                    let currentField = "";
-                    let inFieldQuotes = false;
+                    const fields = []; let currentField = ""; let inFieldQuotes = false;
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
                         if (char === '"') {
                             if (inFieldQuotes && i + 1 < line.length && line[i+1] === '"') {
-                                currentField += '"'; // Escaped quote
-                                i++; // Skip next quote
-                            } else {
-                                inFieldQuotes = !inFieldQuotes;
-                            }
+                                currentField += '"'; i++; 
+                            } else { inFieldQuotes = !inFieldQuotes; }
                         } else if (char === ',' && !inFieldQuotes) {
-                            fields.push(currentField);
-                            currentField = "";
-                        } else {
-                            currentField += char;
-                        }
+                            fields.push(currentField); currentField = "";
+                        } else { currentField += char; }
                     }
-                    fields.push(currentField); // Add the last field
-                    return fields.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"')); // Clean surrounding quotes and internal escaped quotes
+                    fields.push(currentField); 
+                    return fields.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
                 };
-
                 headers = splitCsvFields(lines[0]);
-                
                 for (let i = 1; i < lines.length; i++) {
                     if (lines[i].trim() === "") continue;
                     const values = splitCsvFields(lines[i]);
                     if (values.length === headers.length) {
                         let row = {};
-                        headers.forEach((header, index) => {
-                            row[header.trim()] = values[index]; // Trim header name just in case
-                        });
+                        headers.forEach((header, index) => { row[header.trim()] = values[index]; });
                         data.push(row);
-                    } else {
-                        console.warn(`Skipping malformed CSV line (field count mismatch after attempting multi-line parse): Line ${i+1} -> Content: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values);
-                    }
+                    } else { console.warn(`Skipping malformed CSV line (field count mismatch): Line ${i+1} -> Content: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values); }
                 }
                 return { headers, data };
             }
@@ -284,8 +258,11 @@
                         }
                         delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
                     }
+                    // For private events, if TimeRange is already set by the map, it's used.
+                    // If the source was named "Time" and mapped to "TimeRange", that's handled.
+                    
                     if (index < 2) { 
-                        console.log(`Normalized event [${index}] from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}'`);
+                        console.log(`Normalized event [${index}] from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}', Weekday: '${normalizedEvent.Weekday}'`);
                     }
                     return normalizedEvent;
                 });
@@ -295,7 +272,7 @@
                 fetch(privateCsvPath).then(response => {
                     if (!response.ok) { 
                         console.error(`Failed to load ${privateCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading private events: ${response.statusText}</p>`;
+                        tableErrorMessageDiv.innerHTML += `<p>Error loading private events (v2): ${response.statusText}</p>`;
                         tableErrorMessageDiv.classList.remove('hidden');
                         return {text: () => Promise.resolve("")}; 
                     }
@@ -303,7 +280,7 @@
                 }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap))
                   .catch(err => {
                       console.error(`Error processing ${privateCsvPath}:`, err);
-                      tableErrorMessageDiv.innerHTML += `<p>Error processing private events file.</p>`;
+                      tableErrorMessageDiv.innerHTML += `<p>Error processing private events file (v2).</p>`;
                       tableErrorMessageDiv.classList.remove('hidden');
                       return []; 
                   }),
@@ -332,7 +309,7 @@
                      if (!tableErrorMessageDiv.classList.contains('hidden') && tableErrorMessageDiv.textContent.includes("Error")) {
                         // Error already shown
                      } else {
-                        tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/private_events.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
+                        tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/folkemoedet_private_events_v2.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
                         tableErrorMessageDiv.classList.remove('hidden');
                      }
                 } else {
