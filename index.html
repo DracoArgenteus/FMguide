@@ -18,10 +18,12 @@
             font-family: 'Inter', sans-serif;
         }
         .dataTables_wrapper .dataTables_length,
-        .dataTables_wrapper .dataTables_filter,
+        .dataTables_wrapper .dataTables_filter { /* Grouped filter and length for spacing */
+            margin-bottom: 1rem;
+        }
         .dataTables_wrapper .dataTables_info,
         .dataTables_wrapper .dataTables_paginate {
-            margin-bottom: 1rem; /* Add some space around DataTables controls */
+            margin-top: 1rem; /* Add space above info and pagination */
         }
         .dataTables_wrapper .dataTables_filter input {
             border: 1px solid #cbd5e1; /* gray-300 */
@@ -56,6 +58,27 @@
             border-radius: 0.375rem; /* rounded-md */
             margin-top: 1rem;
         }
+        /* Styles for filter buttons */
+        .filter-buttons button {
+            padding: 0.5rem 1rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem; /* For wrapping on small screens */
+            border-radius: 0.375rem; /* rounded-md */
+            border: 1px solid transparent;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .filter-buttons button.active-filter {
+            background-color: #2563eb; /* Tailwind blue-600 */
+            color: white;
+            border-color: #1d4ed8; /* Tailwind blue-700 */
+        }
+        .filter-buttons button:not(.active-filter) {
+            background-color: #e5e7eb; /* Tailwind gray-200 */
+            color: #374151; /* Tailwind gray-700 */
+        }
+        .filter-buttons button:not(.active-filter):hover {
+            background-color: #d1d5db; /* Tailwind gray-300 */
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 p-4 md:p-8">
@@ -63,7 +86,7 @@
     <div class="container mx-auto max-w-7xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Interactive Event Schedule</h1>
-            <p class="text-gray-600 mt-2">Browse, search, and sort events. Default view is sorted by Weekday.</p>
+            <p class="text-gray-600 mt-2">Browse, search, and sort events. Filter by weekday using the buttons below.</p>
         </header>
 
         <div id="instructions" class="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
@@ -71,24 +94,21 @@
             <ol class="list-decimal list-inside space-y-2 text-gray-700">
                 <li>Save the CSV data (provided in the other artifact, now with fuller descriptions) into a file named `folkemoedet_events.csv`.</li>
                 <li>Place this HTML file and the `folkemoedet_events.csv` file in the same folder.</li>
-                <li>
-                    <strong>For GitHub Pages:</strong>
-                    <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
-                        <li>Create a new public repository on GitHub.</li>
-                        <li>Upload this HTML file (e.g., as `index.html`) and the `folkemoedet_events.csv` file to the root of that repository.</li>
-                        <li>Go to your repository's "Settings" page.</li>
-                        <li>Scroll down to the "Pages" section in the left sidebar.</li>
-                        <li>Under "Branch", select your main branch (usually `main` or `master`) and `/ (root)` folder, then click "Save".</li>
-                        <li>GitHub will provide you with a URL (e.g., `https://your-username.github.io/your-repository-name/`) where your interactive table will be live. It might take a few minutes for the site to be deployed.</li>
-                    </ul>
-                </li>
-                <li>If you open this HTML file directly in your browser from your local file system, it should also work, fetching the local CSV file.</li>
+                <li>Follow GitHub Pages instructions if hosting online.</li>
             </ol>
-            <p class="mt-4 text-sm text-blue-600"><strong>Note on Pivot Tables:</strong> This setup provides robust sorting, searching, and pagination. True pivot table functionality directly from a static CSV on the client-side is more advanced. For that, you might explore libraries like <a href="https://webdatarocks.com/" target="_blank" class="underline hover:text-blue-800">WebDataRocks</a> (has free tier) or <a href="https://www.ag-grid.com/" target="_blank" class="underline hover:text-blue-800">ag-Grid</a> (community version is free), which offer more complex data manipulation capabilities but might have a steeper learning curve or different integration methods.</p>
+             <p class="mt-4 text-sm text-blue-600"><strong>Note on Pivot Tables:</strong> This setup provides robust sorting, searching, and pagination. True pivot table functionality directly from a static CSV on the client-side is more advanced.</p>
         </div>
         
         <div id="tableErrorMessage" class="hidden error-message"></div>
 
+        <!-- Weekday Filter Buttons -->
+        <div class="filter-buttons mb-6 text-center sm:text-left">
+            <button data-day="All" class="active-filter">All Days</button>
+            <button data-day="Torsdag">Torsdag</button>
+            <button data-day="Fredag">Fredag</button>
+            <button data-day="Lørdag">Lørdag</button>
+            <!-- Add more buttons if other weekdays exist in your data -->
+        </div>
 
         <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
             <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
@@ -111,39 +131,29 @@
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
         $(document).ready(function() {
-            // Path to your CSV file - ensure this matches the filename you use.
             const csvFilePath = 'folkemoedet_events.csv';
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
+            let eventDataTable = null; // To store the DataTable instance
 
-            // Enhanced CSV parsing function to handle commas within quoted fields
             function robustParseCSV(csvText) {
-                // Normalize line endings (CRLF and CR to LF) then split by LF
                 const lines = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-                
                 if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === "")) {
-                    // Handle empty or effectively empty CSV after trimming
-                    console.warn("CSV content is empty or contains only whitespace after trimming.");
                     return { headers: [], data: [] };
                 }
-
-
-                // Function to split a CSV line considering quotes
                 const splitCsvLine = (line) => {
                     const result = [];
                     let current = '';
                     let inQuotes = false;
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
-                        if (char === '"') { // Handles escaped quotes "" inside a quoted field by toggling
+                        if (char === '"') {
                             if (i + 1 < line.length && line[i+1] === '"') {
-                                current += '"'; // Add one quote and skip the next one
-                                i++;
+                                current += '"'; i++;
                             } else {
                                 inQuotes = !inQuotes;
                             }
                         } else if (char === ',' && !inQuotes) {
-                            result.push(current.trim()); 
-                            current = '';
+                            result.push(current.trim()); current = '';
                         } else {
                             current += char;
                         }
@@ -151,66 +161,46 @@
                     result.push(current.trim()); 
                     return result.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
                 };
-                
                 const headers = splitCsvLine(lines[0]);
                 const data = [];
-
-                // Start data rows from the second line (index 1)
                 for (let i = 1; i < lines.length; i++) {
                     if (lines[i].trim() === "") continue; 
                     const values = splitCsvLine(lines[i]);
                     if (values.length === headers.length) {
                         let row = {};
-                        headers.forEach((header, index) => {
-                            row[header] = values[index];
-                        });
+                        headers.forEach((header, index) => { row[header] = values[index]; });
                         data.push(row);
                     } else {
-                        console.warn("Skipping malformed CSV line (field count mismatch):", `Line ${i+1}: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values);
+                        console.warn("Skipping malformed CSV line (field count mismatch):", `Line ${i+1}: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length);
                     }
                 }
                 return { headers, data };
             }
 
-
             fetch(csvFilePath)
                 .then(response => {
                     if (!response.ok) {
-                        // Provide a more specific error message based on status
                         let errorDetail = `HTTP error! Status: ${response.status}.`;
                         if (response.status === 404) {
-                            errorDetail += ` The file '${csvFilePath}' was not found. Please ensure it's in the same directory as this HTML file and the name is correct.`;
-                        } else {
-                            errorDetail += ` There was a problem fetching the file.`;
+                            errorDetail += ` The file '${csvFilePath}' was not found. Ensure it's in the same directory and name is correct.`;
                         }
                         throw new Error(errorDetail);
                     }
                     return response.text();
                 })
                 .then(csvText => {
-                    tableErrorMessageDiv.classList.add('hidden'); // Hide error message if fetch was successful
-                    // console.log("Raw CSV Text:", csvText); // For debugging the raw fetched text
+                    tableErrorMessageDiv.classList.add('hidden');
                     const { headers, data } = robustParseCSV(csvText);
-                    // console.log("Parsed Headers:", headers); // For debugging parsed headers
-                    // console.log("Parsed Data Rows:", data); // For debugging parsed data
 
                     if (headers.length === 0 ) {
-                         const message = `Could not parse CSV headers from '${csvFilePath}'. Check CSV format (especially the first line), file path, and ensure the file is not empty.`;
+                         const message = `Could not parse CSV headers from '${csvFilePath}'. Check CSV format.`;
                         console.error(message);
                         tableErrorMessageDiv.textContent = message;
                         tableErrorMessageDiv.classList.remove('hidden');
-                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not display data. See message above.</td></tr></tbody>');
+                        $('#eventTable').html('<thead><tr><th>Error</th></tr></thead><tbody><tr><td>Could not display data.</td></tr></tbody>');
                         return;
                     }
-                    if (data.length === 0 && csvText.trim() !== "" && lines.length > 1) { // Only show "no data" if file wasn't empty but parsing yielded no data rows.
-                        const message = `Successfully parsed headers, but no data rows were found or parsed correctly in '${csvFilePath}'. Check CSV data rows format.`;
-                        console.warn(message); // Use warn as headers might be fine
-                        // Optionally display this message to the user, or let DataTables show "No data available in table"
-                        // tableErrorMessageDiv.textContent = message;
-                        // tableErrorMessageDiv.classList.remove('hidden');
-                    }
                     
-                    // Dynamically create table headers
                     let headerHtml = '<tr>';
                     headers.forEach(header => {
                         headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`;
@@ -218,11 +208,9 @@
                     headerHtml += '</tr>';
                     $('#eventTable thead').html(headerHtml);
 
-                    // Prepare data for DataTables (array of arrays)
                     const dataSet = data.map(row => headers.map(header => row[header]));
 
-                    // Initialize DataTables
-                    $('#eventTable').DataTable({
+                    eventDataTable = $('#eventTable').DataTable({ // Assign to eventDataTable
                         data: dataSet,
                         responsive: true,
                         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
@@ -232,23 +220,41 @@
                             searchPlaceholder: "Search events...",
                             lengthMenu: "Show _MENU_ entries",
                             zeroRecords: "No matching events found",
-                            emptyTable: "No events available in table" // Message when dataSet is empty
+                            emptyTable: "No events available in table"
                         },
-                        order: [[0, 'asc']], // Sort by the first column (Weekday) in ascending order
+                        order: [[0, 'asc']], 
                         columnDefs: [ 
-                            { width: '10%', targets: 0 }, 
-                            { width: '15%', targets: 1 }  
+                            { width: '10%', targets: 0 }, // Weekday
+                            { width: '15%', targets: 1 }  // Time
                         ]
                     });
                 })
                 .catch(error => {
                     console.error('Error initializing table:', error);
-                    const fullErrorMessage = `Failed to load or process '${csvFilePath}'. Error: ${error.message}. Check the browser's developer console (F12) for more details, and verify the file location and name.`;
+                    const fullErrorMessage = `Failed to load or process '${csvFilePath}'. Error: ${error.message}. Check console (F12) and file location/name.`;
                     tableErrorMessageDiv.textContent = fullErrorMessage;
                     tableErrorMessageDiv.classList.remove('hidden');
-                    // Display a simpler message in the table itself
-                    $('#eventTable').html(`<thead><tr><th>Loading Error</th></tr></thead><tbody><tr><td>Could not load event data. Please see error message above the table.</td></tr></tbody>`);
+                    $('#eventTable').html(`<thead><tr><th>Loading Error</th></tr></thead><tbody><tr><td>Could not load data.</td></tr></tbody>`);
                 });
+
+            // Event listeners for filter buttons
+            $('.filter-buttons button').on('click', function() {
+                const dayFilter = $(this).data('day');
+                
+                // Update active button style
+                $('.filter-buttons button').removeClass('active-filter');
+                $(this).addClass('active-filter');
+
+                if (eventDataTable) {
+                    if (dayFilter === "All") {
+                        eventDataTable.column(0).search('').draw(); // Clear search on the first column (Weekday)
+                    } else {
+                        // Search for the exact day string, case-sensitive.
+                        // Use '^' + dayFilter + '$' for exact match regex.
+                        eventDataTable.column(0).search('^' + dayFilter + '$', true, false).draw();
+                    }
+                }
+            });
         });
     </script>
 
