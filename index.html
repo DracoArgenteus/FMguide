@@ -57,6 +57,7 @@
         .modal-footer { padding-top: 10px; border-top: 1px solid #eee; text-align: right; }
         .close-button { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
         .close-button:hover { background-color: #dc2626; }
+        #dataFreshness { font-size: 0.875rem; color: #4b5563; margin-top: -0.5rem; margin-bottom: 1rem; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 p-4 md:p-8">
@@ -64,6 +65,7 @@
     <div class="container mx-auto max-w-7xl">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
+            <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
             <p class="text-gray-600 mt-2">Official and Private event lists. Use filters to browse.</p>
         </header>
 
@@ -126,9 +128,9 @@
         ];
         
         const privateDataMap = {
-            "EventTitle": "EventTitle", "Weekday": "Weekday", "TimeRange": "TimeRange", "Location": "Location", // Time was already TimeRange in the new CSV
+            "EventTitle": "EventTitle", "Weekday": "Weekday", "TimeRange": "TimeRange", 
             "Description": "Description", "EventURL": "EventURL", 
-            "Organizers": "Organizers", "Theme": "Theme", 
+            "Organizers": "Organizers", "Theme": "Theme", "Location": "Location",
             "DataSource": "DataSource", "OriginalSourceDoc": "OriginalSourceDoc"
         };
 
@@ -140,11 +142,12 @@
         };
 
         $(document).ready(function() {
-            // CORRECTED FILE PATH FOR PRIVATE EVENTS
+            // Use the filename you specified
             const privateCsvPath = 'data/folkemoedet_private_events.csv'; 
             const officialCsvPath = 'data/official_events_combined.csv';
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
+            const dataFreshnessElement = document.getElementById('dataFreshness');
             let eventDataTable = null;
             let allNormalizedEvents = []; 
 
@@ -230,6 +233,23 @@
                     return 'Date Error';
                 }
             }
+            
+            function timeAgo(date) {
+                if (!date) return "unknown";
+                const seconds = Math.floor((new Date() - date) / 1000);
+                let interval = seconds / 31536000;
+                if (interval > 1) return Math.floor(interval) + " years ago";
+                interval = seconds / 2592000;
+                if (interval > 1) return Math.floor(interval) + " months ago";
+                interval = seconds / 86400;
+                if (interval > 1) return Math.floor(interval) + " days ago";
+                interval = seconds / 3600;
+                if (interval > 1) return Math.floor(interval) + " hours ago";
+                interval = seconds / 60;
+                if (interval > 1) return Math.floor(interval) + " minutes ago";
+                return Math.floor(seconds) + " seconds ago";
+            }
+
 
             function normalizeData(rawData, sourceName, map) {
                 return rawData.map((rawEvent, index) => { 
@@ -258,29 +278,30 @@
                         }
                         delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
                     }
-                    // For private events, if TimeRange is already set by the map, it's used.
-                    // If the source was named "Time" and mapped to "TimeRange", that's handled.
                     
-                    if (index < 2) { 
-                        console.log(`Normalized event [${index}] from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}', Weekday: '${normalizedEvent.Weekday}'`);
+                    if (index < 1) { 
+                        console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}', Weekday: '${normalizedEvent.Weekday}'`);
                     }
                     return normalizedEvent;
                 });
             }
+            
+            let lastModifiedTimestamps = [];
 
             Promise.all([
                 fetch(privateCsvPath).then(response => {
                     if (!response.ok) { 
                         console.error(`Failed to load ${privateCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading private events (v2): ${response.statusText}</p>`;
+                        tableErrorMessageDiv.innerHTML += `<p>Error loading private events: ${response.statusText}</p>`;
                         tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve("")}; 
+                        return {text: () => Promise.resolve(""), headers: {get: () => null}}; 
                     }
-                    return response;
-                }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap))
+                    lastModifiedTimestamps.push(response.headers.get('Last-Modified'));
+                    return response.text();
+                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap))
                   .catch(err => {
                       console.error(`Error processing ${privateCsvPath}:`, err);
-                      tableErrorMessageDiv.innerHTML += `<p>Error processing private events file (v2).</p>`;
+                      tableErrorMessageDiv.innerHTML += `<p>Error processing private events file.</p>`;
                       tableErrorMessageDiv.classList.remove('hidden');
                       return []; 
                   }),
@@ -288,20 +309,29 @@
                 fetch(officialCsvPath).then(response => {
                     if (!response.ok) { 
                         console.error(`Failed to load ${officialCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading official events: ${response.statusText}. (Combined CSV may be empty or missing from 'data/' folder)</p>`;
+                        tableErrorMessageDiv.innerHTML += `<p>Error loading official events: ${response.statusText}.</p>`;
                         tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve("")}; 
+                        return {text: () => Promise.resolve(""), headers: {get: () => null}}; 
                     }
-                    return response;
-                }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
+                    lastModifiedTimestamps.push(response.headers.get('Last-Modified'));
+                    return response.text();
+                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
                   .catch(err => {
                       console.error(`Error processing ${officialCsvPath}:`, err);
-                       tableErrorMessageDiv.innerHTML += `<p>Error processing official events file. (Combined CSV may be empty or corrupt)</p>`;
+                       tableErrorMessageDiv.innerHTML += `<p>Error processing official events file.</p>`;
                        tableErrorMessageDiv.classList.remove('hidden');
                       return []; 
                   })
             ])
             .then(([privateEvents, officialEvents]) => {
+                const validDates = lastModifiedTimestamps.filter(d => d !== null).map(d => new Date(d));
+                if (validDates.length > 0) {
+                    const mostRecentDate = new Date(Math.max.apply(null, validDates));
+                    dataFreshnessElement.textContent = `Data last updated: ${mostRecentDate.toLocaleString()} (${timeAgo(mostRecentDate)})`;
+                } else {
+                    dataFreshnessElement.textContent = "Data update time: Not available";
+                }
+
                 allNormalizedEvents = privateEvents.concat(officialEvents);
                 console.log(`Total normalized events: ${allNormalizedEvents.length} (Private: ${privateEvents.length}, Official: ${officialEvents.length})`);
                                 
@@ -373,6 +403,7 @@
                 console.error('General error loading or processing CSV data:', error);
                 tableErrorMessageDiv.textContent = `General Error: ${error.message}. Check console and CSV files.`;
                 tableErrorMessageDiv.classList.remove('hidden');
+                 dataFreshnessElement.textContent = "Could not determine data update time.";
             });
 
             let currentSourceFilter = "All";
@@ -405,11 +436,9 @@
                 }
 
                 let sourceSearchTermRegex = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
-                console.log(`Applying DataSource search with regex: '${sourceSearchTermRegex}' (case-insensitive) to column index ${dataSourceColIdx}`);
                 eventDataTable.column(dataSourceColIdx).search(sourceSearchTermRegex, true, false, true).draw(false);
 
                 let daySearchTermRegex = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
-                console.log(`Applying Weekday search with regex: '${daySearchTermRegex}' (case-insensitive) to column index ${weekdayColIdx}`);
                 eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); 
 
                 eventDataTable.draw(); 
