@@ -4,36 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Folkemødet 2025 - Combined Event Schedule with Stats</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
-    <!-- DataTables CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-    <!-- DataTables JS -->
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; display: flex; } /* Flex for side panel */
-        .main-content { flex-grow: 1; /* Main content takes up available space */ }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; /* Remove default body margin */
+            display: flex; /* Use flex for overall layout */
+            min-height: 100vh; /* Ensure body takes at least full viewport height */
+            background-color: #f3f4f6; /* Tailwind gray-100 for overall background */
+        }
+        .main-container { /* New wrapper for main content and side panel */
+            display: flex;
+            flex-grow: 1; /* Allows container to fill space */
+            width: 100%;
+        }
+        .main-content { 
+            flex-grow: 1; 
+            padding: 1rem; /* Tailwind p-4 */
+            overflow-y: auto; /* Allow main content to scroll independently if needed */
+            max-height: 100vh; /* Prevent main content from making page too tall for sticky panel to work */
+        }
         .side-panel {
-            width: 300px; /* Adjust as needed */
-            min-width: 250px;
+            width: 300px; 
+            min-width: 280px; /* Ensure it doesn't get too squished */
             max-width: 350px;
-            padding: 1rem;
+            padding: 1.5rem; /* Tailwind p-6 */
             background-color: #f9fafb; /* Tailwind gray-50 */
             border-left: 1px solid #e5e7eb; /* Tailwind gray-200 */
-            overflow-y: auto;
-            height: 100vh; /* Full viewport height */
-            position: sticky; /* Sticky positioning */
+            overflow-y: auto; /* Allow side panel content to scroll */
+            height: 100vh; /* Make side panel take full viewport height */
+            position: sticky; 
             top: 0;
+            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out; /* Smooth transition for hiding/showing */
         }
-        @media (max-width: 1024px) { /* On smaller screens, stack them or hide side panel */
-            body { flex-direction: column; }
-            .side-panel { width: 100%; height: auto; max-height: 50vh; position: static; border-left: none; border-top: 1px solid #e5e7eb;}
+        .side-panel.hidden-panel {
+            transform: translateX(100%); /* Slide out to the right */
+            width: 0;
+            min-width: 0;
+            padding: 0;
+            border-left: none;
+            overflow: hidden; /* Hide content when panel is collapsed */
         }
 
+        /* DataTables and other existing styles */
         .dataTables_wrapper .dataTables_length,
         .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
         .dataTables_wrapper .dataTables_info,
@@ -50,7 +67,7 @@
         .filter-buttons button, .source-filter-buttons button {
             padding: 0.5rem 1rem; margin-right: 0.5rem; margin-bottom: 0.5rem;
             border-radius: 0.375rem; border: 1px solid transparent;
-            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out; cursor: pointer;
         }
         .filter-buttons button.active-filter, .source-filter-buttons button.active-filter {
             background-color: #2563eb; color: white; border-color: #1d4ed8;
@@ -80,67 +97,102 @@
         #dataFreshness { font-size: 0.875rem; color: #4b5563; margin-top: -0.5rem; margin-bottom: 1rem; }
         .chart-container { margin-bottom: 2rem; }
         .chart-container h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+
+        #toggleStatsButton {
+            position: fixed;
+            top: 1rem; /* Tailwind top-4 */
+            right: 1rem; /* Tailwind right-4 */
+            z-index: 1050; /* Ensure it's above modal backdrop but potentially below open modal */
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            color: white;
+            padding: 0.5rem 1rem; /* Tailwind p-2 px-4 */
+            border-radius: 0.375rem; /* Tailwind rounded-md */
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); /* Tailwind shadow-lg */
+            cursor: pointer;
+        }
+        /* On smaller screens, we will hide the side panel by default and the button might be more prominent */
+        @media (max-width: 1024px) {
+            .main-container { flex-direction: column; }
+            .side-panel {
+                width: 100%; /* Full width when stacked */
+                max-height: none; /* Allow it to take needed height or a specific max if desired */
+                height: auto; /* Or specific like 50vh */
+                position: static; /* No longer sticky when stacked */
+                border-left: none;
+                border-top: 1px solid #e5e7eb;
+                transform: translateY(0); /* Reset transform for stacked view */
+            }
+            .side-panel.hidden-panel {
+                display: none; /* Simple hide for stacked view */
+            }
+            #toggleStatsButton {
+                /* Adjust button position for mobile if needed, or keep it fixed */
+            }
+        }
+
     </style>
 </head>
 <body class="bg-gray-100">
-    <div class="main-content p-4 md:p-8">
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
-            <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
-            <p class="text-gray-600 mt-2">Official and Private event lists. Use filters to browse.</p>
-        </header>
+    <div class="main-container">
+        <div class="main-content">
+            <header class="mb-8 text-center">
+                <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
+                <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
+                <p class="text-gray-600 mt-2">Official and Private event lists. Use filters to browse.</p>
+            </header>
 
-        <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
-            <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
-            <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
-                <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
-                <li>Use the "Day" buttons to filter by weekday.</li>
-                <li>Click on truncated descriptions or links for more details.</li>
-                <li>Statistics in the side panel update based on your filters.</li>
-            </ol>
+            <button id="toggleStatsButton">Toggle Stats</button>
+
+            <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
+                <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
+                <ol class="list-decimal list-inside space-y-1 text-gray-700">
+                    <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
+                    <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
+                    <li>Use the "Day" buttons to filter by weekday.</li>
+                    <li>Click on truncated descriptions or links for more details.</li>
+                    <li>Statistics in the side panel update based on your filters. Use "Toggle Stats" button.</li>
+                </ol>
+            </div>
+            
+            <div id="tableErrorMessage" class="hidden error-message"></div>
+
+            <div class="source-filter-buttons mb-4 text-center sm:text-left">
+                <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Source:</h3>
+                <button data-source="All" class="active-filter">All Sources</button>
+                <button data-source="Official">Official Program</button>
+                <button data-source="Private">Private List</button>
+            </div>
+
+            <div class="filter-buttons mb-6 text-center sm:text-left">
+                <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Day:</h3>
+                <button data-day="All" class="active-filter">All Days</button>
+                <button data-day="Torsdag">Torsdag</button>
+                <button data-day="Fredag">Fredag</button>
+                <button data-day="Lørdag">Lørdag</button>
+            </div>
+
+            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
+                <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <footer class="mt-12 text-center text-sm text-gray-500">
+                <p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer.</p>
+            </footer>
         </div>
-        
-        <div id="tableErrorMessage" class="hidden error-message"></div>
 
-        <!-- Source Filter Buttons -->
-        <div class="source-filter-buttons mb-4 text-center sm:text-left">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Source:</h3>
-            <button data-source="All" class="active-filter">All Sources</button>
-            <button data-source="Official">Official Program</button>
-            <button data-source="Private">Private List</button>
-        </div>
-
-        <!-- Weekday Filter Buttons -->
-        <div class="filter-buttons mb-6 text-center sm:text-left">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Filter by Day:</h3>
-            <button data-day="All" class="active-filter">All Days</button>
-            <button data-day="Torsdag">Torsdag</button>
-            <button data-day="Fredag">Fredag</button>
-            <button data-day="Lørdag">Lørdag</button>
-        </div>
-
-        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-lg table-container">
-            <table id="eventTable" class="display cell-border hover order-column stripe" style="width:100%">
-                <thead></thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        <footer class="mt-12 text-center text-sm text-gray-500">
-            <p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer.</p>
-        </footer>
-    </div>
-
-    <div class="side-panel">
-        <h3 class="text-xl font-bold text-blue-600 mb-4">Event Statistics</h3>
-        <div class="chart-container">
-            <h4>Events per Hour</h4>
-            <canvas id="eventsPerHourChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <h4>Events per Theme (Top 10)</h4>
-            <canvas id="eventsPerThemeChart"></canvas>
+        <div class="side-panel hidden-panel"> <!-- Start hidden on small screens, controlled by JS for large -->
+            <h3 class="text-xl font-bold text-blue-600 mb-4">Event Statistics</h3>
+            <div class="chart-container">
+                <h4>Events per Hour</h4>
+                <canvas id="eventsPerHourChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h4>Events per Theme (Top 10)</h4>
+                <canvas id="eventsPerThemeChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -183,6 +235,8 @@
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
             const dataFreshnessElement = document.getElementById('dataFreshness');
+            const sidePanel = document.querySelector('.side-panel');
+            const toggleStatsButton = document.getElementById('toggleStatsButton');
             let eventDataTable = null;
             let allNormalizedEvents = []; 
 
@@ -191,46 +245,31 @@
             const modalFullDescription = document.getElementById('modalFullDescription');
             const closeModalButton = document.getElementById('closeModalButton');
 
-            // Chart instances
             let eventsPerHourChartInstance = null;
             let eventsPerThemeChartInstance = null;
 
             function robustParseCSV(csvText) {
-                // ... (robustParseCSV function from previous version - unchanged)
-                const data = [];
-                let headers = [];
+                const data = []; let headers = [];
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                const lines = [];
-                let inQuotes = false;
-                let currentLine = "";
+                const lines = []; let inQuotes = false; let currentLine = "";
                 for (let i = 0; i < normalizedCsvText.length; i++) {
-                    const char = normalizedCsvText[i];
-                    currentLine += char;
+                    const char = normalizedCsvText[i]; currentLine += char;
                     if (char === '"') {
-                        if (i + 1 < normalizedCsvText.length && normalizedCsvText[i+1] === '"') {
-                            currentLine += '"'; i++;
-                        } else {
-                            inQuotes = !inQuotes;
-                        }
-                    } else if (char === '\n' && !inQuotes) {
-                        lines.push(currentLine.trim());
-                        currentLine = "";
-                    }
+                        if (i + 1 < normalizedCsvText.length && normalizedCsvText[i+1] === '"') { currentLine += '"'; i++; } 
+                        else { inQuotes = !inQuotes; }
+                    } else if (char === '\n' && !inQuotes) { lines.push(currentLine.trim()); currentLine = ""; }
                 }
                 if (currentLine.trim()) { lines.push(currentLine.trim()); }
                 if (lines.length === 0) return { headers, data };
-
                 const splitCsvFields = (line) => {
                     const fields = []; let currentField = ""; let inFieldQuotes = false;
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
                         if (char === '"') {
-                            if (inFieldQuotes && i + 1 < line.length && line[i+1] === '"') {
-                                currentField += '"'; i++; 
-                            } else { inFieldQuotes = !inFieldQuotes; }
-                        } else if (char === ',' && !inFieldQuotes) {
-                            fields.push(currentField); currentField = "";
-                        } else { currentField += char; }
+                            if (inFieldQuotes && i + 1 < line.length && line[i+1] === '"') { currentField += '"'; i++; } 
+                            else { inFieldQuotes = !inFieldQuotes; }
+                        } else if (char === ',' && !inFieldQuotes) { fields.push(currentField); currentField = ""; } 
+                        else { currentField += char; }
                     }
                     fields.push(currentField); 
                     return fields.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
@@ -240,92 +279,55 @@
                     if (lines[i].trim() === "") continue;
                     const values = splitCsvFields(lines[i]);
                     if (values.length === headers.length) {
-                        let row = {};
-                        headers.forEach((header, index) => { row[header.trim()] = values[index]; });
+                        let row = {}; headers.forEach((header, index) => { row[header.trim()] = values[index]; });
                         data.push(row);
-                    } else { console.warn(`Skipping malformed CSV line (field count mismatch): Line ${i+1} -> Content: "${lines[i]}"`, "Expected", headers.length, "fields, got", values.length, "Values:", values); }
+                    } else { console.warn("Skipping malformed CSV line:", `Line ${i+1}`, values); }
                 }
                 return { headers, data };
             }
 
             function formatTime(ptTime) { 
                 if (!ptTime || !ptTime.startsWith('PT')) return '';
-                let hours = '00', minutes = '00';
-                const H_match = ptTime.match(/(\d+)H/);
-                const M_match = ptTime.match(/(\d+)M/);
-                if (H_match) hours = H_match[1].padStart(2, '0');
-                if (M_match) minutes = M_match[1].padStart(2, '0');
-                return `${hours}:${minutes}`;
+                let h = '00', m = '00';
+                const H_match = ptTime.match(/(\d+)H/); if (H_match) h = H_match[1].padStart(2,'0');
+                const M_match = ptTime.match(/(\d+)M/); if (M_match) m = M_match[1].padStart(2,'0');
+                return `${h}:${m}`;
             }
 
             function dayDateToWeekday(dateString) { 
                 if (!dateString) return '';
                 try {
                     const date = new Date(dateString + 'T00:00:00Z'); 
-                    if (isNaN(date.getDay())) { 
-                        console.warn("Invalid date string for dayDateToWeekday:", dateString);
-                        return 'Invalid Date';
-                    }
-                    const weekdays = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
-                    return weekdays[date.getDay()];
-                } catch (e) {
-                    console.warn("Error parsing date in dayDateToWeekday:", dateString, e);
-                    return 'Date Error';
-                }
+                    if (isNaN(date.getDay())) return 'Invalid Date';
+                    return ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"][date.getDay()];
+                } catch (e) { return 'Date Error'; }
             }
             
             function timeAgo(date) {
                 if (!date) return "unknown";
-                const seconds = Math.floor((new Date() - date) / 1000);
-                let interval = seconds / 31536000;
-                if (interval > 1) return Math.floor(interval) + " years ago";
-                interval = seconds / 2592000;
-                if (interval > 1) return Math.floor(interval) + " months ago";
-                interval = seconds / 86400;
-                if (interval > 1) return Math.floor(interval) + " days ago";
-                interval = seconds / 3600;
-                if (interval > 1) return Math.floor(interval) + " hours ago";
-                interval = seconds / 60;
-                if (interval > 1) return Math.floor(interval) + " minutes ago";
-                return Math.floor(seconds) + " seconds ago";
+                const s = Math.floor((new Date() - date) / 1000); let i = s / 31536000;
+                if (i > 1) return Math.floor(i) + " years ago"; i = s / 2592000;
+                if (i > 1) return Math.floor(i) + " months ago"; i = s / 86400;
+                if (i > 1) return Math.floor(i) + " days ago"; i = s / 3600;
+                if (i > 1) return Math.floor(i) + " hours ago"; i = s / 60;
+                if (i > 1) return Math.floor(i) + " minutes ago"; return Math.floor(s) + " seconds ago";
             }
-
 
             function normalizeData(rawData, sourceName, map) {
                 return rawData.map((rawEvent, index) => { 
                     const normalizedEvent = { DataSource: sourceName }; 
-                    UNIFIED_HEADERS.forEach(header => {
-                        if (header !== 'DataSource') {
-                           normalizedEvent[header] = ''; 
-                        }
-                    });
-                    
-                    for (const rawHeader in map) {
-                        const unifiedHeader = map[rawHeader];
-                        if (rawEvent.hasOwnProperty(rawHeader)) {
-                            normalizedEvent[unifiedHeader] = rawEvent[rawHeader];
-                        }
-                    }
-
+                    UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
+                    for (const rh in map) if (rawEvent.hasOwnProperty(rh)) normalizedEvent[map[rh]] = rawEvent[rh];
                     if (sourceName === "Official") {
                         normalizedEvent.Weekday = dayDateToWeekday(normalizedEvent._FullDate);
-                        const startTimeFormatted = formatTime(normalizedEvent._StartTime);
-                        const endTimeFormatted = formatTime(normalizedEvent._EndTime);
-                        if (startTimeFormatted && endTimeFormatted && startTimeFormatted !== endTimeFormatted) {
-                            normalizedEvent.TimeRange = `${startTimeFormatted}-${endTimeFormatted}`;
-                        } else if (startTimeFormatted) {
-                            normalizedEvent.TimeRange = startTimeFormatted;
-                        }
+                        const startF = formatTime(normalizedEvent._StartTime), endF = formatTime(normalizedEvent._EndTime);
+                        normalizedEvent.TimeRange = (startF && endF && startF !== endF) ? `${startF}-${endF}` : (startF || '');
                         if (normalizedEvent._OfficialYear && normalizedEvent._OfficialCrmId && normalizedEvent._OfficialSlug) {
                             normalizedEvent.EventURL = `https://programoversigt.folkemoedet.dk/events/${normalizedEvent._OfficialYear}/${normalizedEvent._OfficialCrmId}/${normalizedEvent._OfficialSlug}`;
                         }
-                        delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
-                        delete normalizedEvent._OfficialYear; delete normalizedEvent._OfficialCrmId; delete normalizedEvent._OfficialSlug;
+                        ['_FullDate','_StartTime','_EndTime','_OfficialYear','_OfficialCrmId','_OfficialSlug'].forEach(k=>delete normalizedEvent[k]);
                     }
-                    
-                    if (index < 1) { 
-                        // console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', EventURL: '${normalizedEvent.EventURL}'`);
-                    }
+                    // if (index < 1) console.log(`Normalized ${sourceName} sample:`, JSON.parse(JSON.stringify(normalizedEvent)));
                     return normalizedEvent;
                 });
             }
@@ -333,269 +335,95 @@
             let lastModifiedTimestamps = [];
 
             Promise.all([
-                fetch(privateCsvPath).then(response => {
-                    if (!response.ok) { 
-                        console.error(`Failed to load ${privateCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading private events: ${response.statusText}</p>`;
-                        tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve(""), headers: {get: () => null}}; 
-                    }
-                    lastModifiedTimestamps.push(response.headers.get('Last-Modified'));
-                    return response.text();
-                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap))
-                  .catch(err => {
-                      console.error(`Error processing ${privateCsvPath}:`, err);
-                      tableErrorMessageDiv.innerHTML += `<p>Error processing private events file.</p>`;
-                      tableErrorMessageDiv.classList.remove('hidden');
-                      return []; 
-                  }),
-                
-                fetch(officialCsvPath).then(response => {
-                    if (!response.ok) { 
-                        console.error(`Failed to load ${officialCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading official events: ${response.statusText}.</p>`;
-                        tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve(""), headers: {get: () => null}}; 
-                    }
-                    lastModifiedTimestamps.push(response.headers.get('Last-Modified'));
-                    return response.text();
-                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
-                  .catch(err => {
-                      console.error(`Error processing ${officialCsvPath}:`, err);
-                       tableErrorMessageDiv.innerHTML += `<p>Error processing official events file.</p>`;
-                       tableErrorMessageDiv.classList.remove('hidden');
-                      return []; 
-                  })
+                fetch(privateCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${privateCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error private events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Private",privateDataMap)).catch(e=>{console.error(`Proc fail ${privateCsvPath}:`,e); return[];}),
+                fetch(officialCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${officialCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error official events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Official",officialDataMap)).catch(e=>{console.error(`Proc fail ${officialCsvPath}:`,e); return[];})
             ])
             .then(([privateEvents, officialEvents]) => {
-                const validDates = lastModifiedTimestamps.filter(d => d !== null).map(d => new Date(d));
-                if (validDates.length > 0) {
-                    const mostRecentDate = new Date(Math.max.apply(null, validDates));
-                    dataFreshnessElement.textContent = `Data last updated: ${mostRecentDate.toLocaleString()} (${timeAgo(mostRecentDate)})`;
-                } else {
-                    dataFreshnessElement.textContent = "Data update time: Not available";
-                }
-
+                const validDates = lastModifiedTimestamps.filter(d => d).map(d => new Date(d));
+                dataFreshnessElement.textContent = validDates.length > 0 ? `Data last updated: ${new Date(Math.max.apply(null,validDates)).toLocaleString()} (${timeAgo(new Date(Math.max.apply(null,validDates)))})` : "Data update time: Not available";
                 allNormalizedEvents = privateEvents.concat(officialEvents);
-                console.log(`Total normalized events: ${allNormalizedEvents.length} (Private: ${privateEvents.length}, Official: ${officialEvents.length})`);
-                                
-                if (allNormalizedEvents.length === 0) {
-                     if (!tableErrorMessageDiv.classList.contains('hidden') && tableErrorMessageDiv.textContent.includes("Error")) {
-                        // Error already shown
-                     } else {
-                        tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/folkemoedet_private_events.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
-                        tableErrorMessageDiv.classList.remove('hidden');
-                     }
-                } else {
-                    tableErrorMessageDiv.classList.add('hidden');
-                }
-
-                let headerHtml = '<tr>';
-                UNIFIED_HEADERS.forEach(header => {
-                    headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header.replace(/([A-Z])/g, ' $1').trim()}</th>`;
-                });
-                headerHtml += '</tr>';
+                console.log(`Total normalized: ${allNormalizedEvents.length} (Private:${privateEvents.length}, Official:${officialEvents.length})`);
+                if(allNormalizedEvents.length === 0 && !tableErrorMessageDiv.textContent.includes("Error")) tableErrorMessageDiv.textContent = "No event data loaded.";
+                tableErrorMessageDiv.classList.toggle('hidden', allNormalizedEvents.length > 0 || tableErrorMessageDiv.textContent.includes("Error"));
+                
+                let headerHtml = '<tr>'; UNIFIED_HEADERS.forEach(h => {headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); headerHtml+='</tr>';
                 $('#eventTable thead').html(headerHtml);
-
-                const colIdx = {};
-                UNIFIED_HEADERS.forEach((header, i) => colIdx[header] = i);
+                const colIdx = {}; UNIFIED_HEADERS.forEach((h,i) => colIdx[h]=i);
 
                 eventDataTable = $('#eventTable').DataTable({
-                    data: allNormalizedEvents.map(event => UNIFIED_HEADERS.map(header => event[header])),
-                    responsive: true,
-                    lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]],
-                    pageLength: 25,
-                    language: { search: "_INPUT_", searchPlaceholder: "Search all fields...", lengthMenu: "Show _MENU_ entries", zeroRecords: "No matching events found for the current filters.", emptyTable: "No events loaded or selected for display." },
-                    order: [[colIdx.Weekday, 'asc'], [colIdx.TimeRange, 'asc']], 
+                    data: allNormalizedEvents.map(e => UNIFIED_HEADERS.map(h => e[h])),
+                    responsive: true, lengthMenu: [[25,50,100,-1],[25,50,100,"All"]], pageLength: 25,
+                    language: {search:"_INPUT_",searchPlaceholder:"Search...",lengthMenu:"Show _MENU_",zeroRecords:"No matching events.",emptyTable:"No events loaded."},
+                    order: [[colIdx.Weekday,'asc'],[colIdx.TimeRange,'asc']],
                     columnDefs: [ 
-                        { width: '10%', targets: colIdx.Weekday },
-                        { width: '10%', targets: colIdx.TimeRange },
-                        { width: '15%', targets: colIdx.Location, 
-                          render: function (data, type, row, meta) {
-                            if (type === 'display' && data) {
-                                const baseUrl = "https://programoversigt.folkemoedet.dk/";
-                                const encodedLocation = encodeURIComponent(data);
-                                return `<a href="${baseUrl}?location=${encodedLocation}" target="_blank" class="clickable-link" title="View ${data} on Folkemødet map">${data}</a>`;
-                            } return data;
-                          }
-                        },
-                        { 
-                            width: '20%', 
-                            targets: colIdx.Description, 
-                            className: 'truncate-text-container', // Add a class to the <td>
-                            render: function (data, type, row, meta) {
-                                if (type === 'display' && data) {
-                                    const fullText = data; 
-                                    const maxLength = 40; 
-                                    // The max-width for truncation will be handled by CSS on the td/span
-                                    if (fullText.length > maxLength) {
-                                        const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                                        return `<span class="truncate-text" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; 
-                                    }
-                                } return data || ''; 
-                            }
-                        },
-                        { targets: colIdx.EventURL,
-                          render: function(data, type, row, meta) {
-                            if (type === 'display' && data && (data.startsWith('http://') || data.startsWith('https://'))) {
-                                return `<a href="${data}" target="_blank" class="clickable-link" title="View event details">View Event</a>`;
-                            } return data || ''; 
-                          }
-                        },
-                         { targets: colIdx.DataSource, className: "dt-body-center", width: "10%" } 
+                        { width: '8%', targets: colIdx.Weekday }, { width: '8%', targets: colIdx.TimeRange },
+                        { width: '15%', targets: colIdx.Location, render: (d,t) => (t==='display'&&d)?`<a href="https://programoversigt.folkemoedet.dk/?location=${encodeURIComponent(d)}" target="_blank" class="clickable-link" title="View ${d} on map">${d}</a>`:d },
+                        { width: '25%', targets: colIdx.Description, render: (d,t) => { if(t==='display'&&d){const m=45; if(d.length>m) return `<span class="truncate-text" title="Click to read more" data-fulltext="${d.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${d.substring(0,m)}...</span>`;} return d||'';}},
+                        { width: '10%', targets: colIdx.EventURL, render: (d,t) => (t==='display'&&d&&(d.startsWith('http://')||d.startsWith('https://')))?`<a href="${d}" target="_blank" class="clickable-link">View Event</a>`:d||'' },
+                        { width: '10%', targets: colIdx.DataSource, className: "dt-body-center" },
+                        { width: '14%', targets: colIdx.Organizers }, { width: '10%', targets: colIdx.Theme }
                     ]
                 });
-                // Initialize charts and setup draw listener
-                initializeCharts();
-                eventDataTable.on('draw.dt', updateVisualizations);
-                updateVisualizations(); // Initial draw
+                initializeCharts(); eventDataTable.on('draw.dt', updateVisualizations); updateVisualizations();
+            }).catch(e => { console.error('General error:',e); tableErrorMessageDiv.textContent = `General Error: ${e.message}.`; tableErrorMessageDiv.classList.remove('hidden'); dataFreshnessElement.textContent = "Could not determine data update time."; });
 
-            })
-            .catch(error => { 
-                console.error('General error loading or processing CSV data:', error);
-                tableErrorMessageDiv.textContent = `General Error: ${error.message}. Check console and CSV files.`;
-                tableErrorMessageDiv.classList.remove('hidden');
-                dataFreshnessElement.textContent = "Could not determine data update time.";
-            });
-
-            // --- Filter Logic ---
-            let currentSourceFilter = "All";
-            let currentDayFilter = "All";
-
+            let currentSourceFilter = "All", currentDayFilter = "All";
             function applyFilters() {
-                // ... (applyFilters function remains the same as previous version)
-                if (!eventDataTable) {
-                    console.log("DataTable not initialized yet. Skipping applyFilters.");
-                    return;
-                }
-                console.log(`Applying filters - Source: ${currentSourceFilter}, Day: ${currentDayFilter}`);
-                
-                const dataSourceColIdx = UNIFIED_HEADERS.indexOf("DataSource");
-                const weekdayColIdx = UNIFIED_HEADERS.indexOf("Weekday");
-
-                if (dataSourceColIdx === -1 || weekdayColIdx === -1) {
-                    console.error("Could not find DataSource or Weekday column index. UNIFIED_HEADERS:", UNIFIED_HEADERS);
-                    return;
-                }
-
-                if (eventDataTable.rows().count() > 0) {
-                    try {
-                        const uniqueDataSources = eventDataTable.column(dataSourceColIdx).data().unique().toArray();
-                        console.log("DEBUG: Unique DataSource values in table before filtering:", uniqueDataSources);
-                    } catch(e) {
-                        console.warn("Could not get unique DataSource values for debugging.", e);
-                    }
-                } else {
-                    console.log("Table has no data when trying to log unique DataSource values.");
-                }
-
-                let sourceSearchTermRegex = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
-                eventDataTable.column(dataSourceColIdx).search(sourceSearchTermRegex, true, false, true).draw(false);
-
-                let daySearchTermRegex = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
-                eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); 
-
-                eventDataTable.draw(); 
-                // Note: updateVisualizations will be called by the 'draw.dt' event
+                if(!eventDataTable) return; console.log(`Applying filters - Src:${currentSourceFilter}, Day:${currentDayFilter}`);
+                const dsIdx=UNIFIED_HEADERS.indexOf("DataSource"), wdIdx=UNIFIED_HEADERS.indexOf("Weekday");
+                if(dsIdx===-1||wdIdx===-1) { console.error("Col index error."); return; }
+                // if(eventDataTable.rows().count()>0) console.log("DEBUG: Unique DataSources:", eventDataTable.column(dsIdx).data().unique().toArray());
+                eventDataTable.column(dsIdx).search(currentSourceFilter==="All"?'':'^'+currentSourceFilter+'$',true,false,true).draw(false);
+                eventDataTable.column(wdIdx).search(currentDayFilter==="All"?'':'^'+currentDayFilter+'$',true,false,true).draw();
+                // console.log("Table redrawn. Matching:", eventDataTable.rows({search:'applied'}).count());
             }
+            $('.source-filter-buttons button').on('click', function(){ currentSourceFilter=$(this).data('source'); $('.source-filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
+            $('.filter-buttons button').on('click', function(){ currentDayFilter=$(this).data('day'); $('.filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
+            $('#eventTable tbody').on('click', 'span.truncate-text', function(){ const d=$(this).data('fulltext'), r=eventDataTable.row($(this).closest('tr')).data(); modalTitle.textContent=r[UNIFIED_HEADERS.indexOf("EventTitle")]||"Details"; modalFullDescription.textContent=d; modal.style.display="block";});
+            closeModalButton.onclick=()=>modal.style.display="none"; window.onclick=(e)=>{if(e.target==modal)modal.style.display="none";}
 
-            $('.source-filter-buttons button').on('click', function() {
-                currentSourceFilter = $(this).data('source');
-                $('.source-filter-buttons button').removeClass('active-filter');
-                $(this).addClass('active-filter');
-                applyFilters();
-            });
-
-            $('.filter-buttons button').on('click', function() {
-                currentDayFilter = $(this).data('day');
-                $('.filter-buttons button').removeClass('active-filter');
-                $(this).addClass('active-filter');
-                applyFilters();
-            });
-
-            // --- Modal Logic ---
-            $('#eventTable tbody').on('click', 'span.truncate-text', function () {
-                // ... (modal logic remains the same)
-                const fullText = $(this).data('fulltext');
-                const rowDataArray = eventDataTable.row($(this).closest('tr')).data();
-                const titleColIdx = UNIFIED_HEADERS.indexOf("EventTitle");
-                const eventTitleForRow = rowDataArray[titleColIdx] || "Event Details";
-                
-                modalTitle.textContent = eventTitleForRow;
-                modalFullDescription.textContent = fullText;
-                modal.style.display = "block";
-            });
-
-            closeModalButton.onclick = function() { modal.style.display = "none"; }
-            window.onclick = function(event) { if (event.target == modal) { modal.style.display = "none"; } }
-
-            // --- Charting Logic ---
             function initializeCharts() {
-                const hourCtx = document.getElementById('eventsPerHourChart').getContext('2d');
-                eventsPerHourChartInstance = new Chart(hourCtx, {
-                    type: 'bar',
-                    data: { labels: [], datasets: [{ label: 'Events per Hour', data: [], backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] },
-                    options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true, maintainAspectRatio: false }
-                });
-
-                const themeCtx = document.getElementById('eventsPerThemeChart').getContext('2d');
-                eventsPerThemeChartInstance = new Chart(themeCtx, {
-                    type: 'bar',
-                    data: { labels: [], datasets: [{ label: 'Events per Theme', data: [], backgroundColor: 'rgba(75, 192, 192, 0.6)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }] },
-                    options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true, maintainAspectRatio: false }
-                });
+                const hctx = document.getElementById('eventsPerHourChart').getContext('2d');
+                eventsPerHourChartInstance = new Chart(hctx, {type:'bar',data:{labels:[],datasets:[{label:'Events/Hour',data:[],backgroundColor:'rgba(54,162,235,0.7)',borderColor:'rgba(54,162,235,1)',borderWidth:1}]},options:{scales:{y:{beginAtZero:true,ticks:{stepSize:1}}},responsive:true,maintainAspectRatio:false}});
+                const tctx = document.getElementById('eventsPerThemeChart').getContext('2d');
+                eventsPerThemeChartInstance = new Chart(tctx, {type:'bar',data:{labels:[],datasets:[{label:'Events/Theme',data:[],backgroundColor:'rgba(75,192,192,0.7)',borderColor:'rgba(75,192,192,1)',borderWidth:1}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{stepSize:1}}},responsive:true,maintainAspectRatio:false}});
             }
-
             function updateVisualizations() {
-                if (!eventDataTable || !eventsPerHourChartInstance || !eventsPerThemeChartInstance) {
-                    console.log("DataTable or charts not ready for visualization update.");
-                    return;
-                }
-                console.log("Updating visualizations...");
-
-                const filteredData = eventDataTable.rows({ search: 'applied' }).data().toArray();
-                const timeRangeColIdx = UNIFIED_HEADERS.indexOf("TimeRange");
-                const themeColIdx = UNIFIED_HEADERS.indexOf("Theme");
-
-                // --- Events per Hour Data ---
-                const hourlyCounts = {};
-                for (let i = 0; i < 24; i++) { hourlyCounts[i.toString().padStart(2, '0')] = 0; } // Initialize 00-23
-
-                filteredData.forEach(row => {
-                    const timeRange = row[timeRangeColIdx]; // e.g., "09:00" or "10:00-11:45"
-                    if (timeRange) {
-                        const startTimeMatch = timeRange.match(/^(\d{2}):\d{2}/); // Get start hour
-                        if (startTimeMatch) {
-                            const hour = startTimeMatch[1];
-                            if (hourlyCounts.hasOwnProperty(hour)) {
-                                hourlyCounts[hour]++;
-                            }
-                        }
-                    }
-                });
-                eventsPerHourChartInstance.data.labels = Object.keys(hourlyCounts);
-                eventsPerHourChartInstance.data.datasets[0].data = Object.values(hourlyCounts);
-                eventsPerHourChartInstance.update();
-
-                // --- Events per Theme Data ---
-                const themeCounts = {};
-                filteredData.forEach(row => {
-                    const theme = row[themeColIdx] ? row[themeColIdx].trim() : "N/A";
-                    if (theme) {
-                        themeCounts[theme] = (themeCounts[theme] || 0) + 1;
-                    }
-                });
-                
-                // Sort themes by count, take top 10
-                const sortedThemes = Object.entries(themeCounts)
-                                      .sort(([,a],[,b]) => b-a)
-                                      .slice(0, 10);
-
-                eventsPerThemeChartInstance.data.labels = sortedThemes.map(entry => entry[0]);
-                eventsPerThemeChartInstance.data.datasets[0].data = sortedThemes.map(entry => entry[1]);
-                eventsPerThemeChartInstance.update();
-                console.log("Visualizations updated.");
+                if(!eventDataTable||!eventsPerHourChartInstance||!eventsPerThemeChartInstance) return;
+                const fData = eventDataTable.rows({search:'applied'}).data().toArray();
+                const trIdx=UNIFIED_HEADERS.indexOf("TimeRange"), thIdx=UNIFIED_HEADERS.indexOf("Theme");
+                const hrCnt={}; for(let i=0;i<24;i++)hrCnt[i.toString().padStart(2,'0')]=0;
+                fData.forEach(r=>{const tr=r[trIdx];if(tr){const sm=tr.match(/^(\d{2}):\d{2}/);if(sm)if(hrCnt.hasOwnProperty(sm[1]))hrCnt[sm[1]]++;}});
+                eventsPerHourChartInstance.data.labels=Object.keys(hrCnt); eventsPerHourChartInstance.data.datasets[0].data=Object.values(hrCnt); eventsPerHourChartInstance.update();
+                const thCnt={}; fData.forEach(r=>{const th=r[thIdx]?r[thIdx].trim():"N/A";if(th)thCnt[th]=(thCnt[th]||0)+1;});
+                const sThemes=Object.entries(thCnt).sort(([,a],[,b])=>b-a).slice(0,10);
+                eventsPerThemeChartInstance.data.labels=sThemes.map(e=>e[0]); eventsPerThemeChartInstance.data.datasets[0].data=sThemes.map(e=>e[1]); eventsPerThemeChartInstance.update();
+                // console.log("Visualizations updated.");
             }
+
+            // Sidebar Toggle Logic
+            if (toggleStatsButton && sidePanel) {
+                 // Default state on larger screens: Show panel. Hide on smaller.
+                if (window.innerWidth <= 1024) {
+                    sidePanel.classList.add('hidden-panel'); // Start hidden on mobile
+                } else {
+                    sidePanel.classList.remove('hidden-panel'); // Start visible on desktop
+                }
+
+                toggleStatsButton.addEventListener('click', () => {
+                    sidePanel.classList.toggle('hidden-panel');
+                    // Optional: you might need to tell DataTables/Charts to resize/redraw if panel visibility changes layout significantly
+                    if (!sidePanel.classList.contains('hidden-panel')) {
+                        setTimeout(() => { // Give a moment for panel to animate
+                            if (eventsPerHourChartInstance) eventsPerHourChartInstance.resize();
+                            if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.resize();
+                        }, 350); // Should match transition duration
+                    }
+                });
+            } else {
+                console.warn("Toggle button or side panel not found.");
+            }
+
         });
     </script>
 </body>
