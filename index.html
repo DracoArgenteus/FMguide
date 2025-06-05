@@ -70,7 +70,7 @@
         <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
             <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
             <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                <li>Ensure `data/folkemoedet_private_events_v2.csv` and `data/official_events_combined.csv` exist.</li>
+                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
                 <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
                 <li>Use the "Day" buttons to filter by weekday.</li>
                 <li>Click on truncated descriptions or links for more details.</li>
@@ -141,7 +141,7 @@
 
         $(document).ready(function() {
             // CORRECTED FILE PATH FOR PRIVATE EVENTS
-            const privateCsvPath = 'data/folkemoedet_private_events_v2.csv'; 
+            const privateCsvPath = 'data/folkemoedet_private_events.csv'; 
             const officialCsvPath = 'data/official_events_combined.csv';
             
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
@@ -309,7 +309,7 @@
                      if (!tableErrorMessageDiv.classList.contains('hidden') && tableErrorMessageDiv.textContent.includes("Error")) {
                         // Error already shown
                      } else {
-                        tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/folkemoedet_private_events_v2.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
+                        tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/folkemoedet_private_events.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
                         tableErrorMessageDiv.classList.remove('hidden');
                      }
                 } else {
