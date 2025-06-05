@@ -139,7 +139,6 @@
         };
 
         $(document).ready(function() {
-            // CORRECTED FILE PATHS HERE:
             const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             
@@ -208,9 +207,13 @@
             }
 
             function normalizeData(rawData, sourceName, map) {
-                return rawData.map(rawEvent => {
-                    const normalizedEvent = { DataSource: sourceName };
-                    UNIFIED_HEADERS.forEach(header => normalizedEvent[header] = ''); 
+                return rawData.map((rawEvent, index) => { // Added index for logging
+                    const normalizedEvent = { DataSource: sourceName }; 
+                    UNIFIED_HEADERS.forEach(header => {
+                        if (header !== 'DataSource') {
+                           normalizedEvent[header] = ''; 
+                        }
+                    });
                     
                     for (const rawHeader in map) {
                         const unifiedHeader = map[rawHeader];
@@ -230,6 +233,10 @@
                         }
                         delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
                     }
+                    // Log the DataSource for the first few items from each source for debugging
+                    if (index < 2) { // Log first 2 items
+                        console.log(`Normalized event [${index}] from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}'`);
+                    }
                     return normalizedEvent;
                 });
             }
@@ -240,7 +247,7 @@
                         console.error(`Failed to load ${privateCsvPath}: ${response.status} ${response.statusText}`); 
                         tableErrorMessageDiv.innerHTML += `<p>Error loading private events: ${response.statusText}</p>`;
                         tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve("")}; // Return empty data structure to allow Promise.all to resolve
+                        return {text: () => Promise.resolve("")}; 
                     }
                     return response;
                 }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap))
@@ -248,42 +255,39 @@
                       console.error(`Error processing ${privateCsvPath}:`, err);
                       tableErrorMessageDiv.innerHTML += `<p>Error processing private events file.</p>`;
                       tableErrorMessageDiv.classList.remove('hidden');
-                      return []; // Return empty array on error for this source
+                      return []; 
                   }),
                 
                 fetch(officialCsvPath).then(response => {
                     if (!response.ok) { 
                         console.error(`Failed to load ${officialCsvPath}: ${response.status} ${response.statusText}`); 
-                        tableErrorMessageDiv.innerHTML += `<p>Error loading official events: ${response.statusText}. Ensure the combined CSV is generated and in the data/ folder.</p>`;
+                        tableErrorMessageDiv.innerHTML += `<p>Error loading official events: ${response.statusText}. (Combined CSV may be empty or missing from 'data/' folder)</p>`;
                         tableErrorMessageDiv.classList.remove('hidden');
-                        return {text: () => Promise.resolve("")}; // Return empty data structure
+                        return {text: () => Promise.resolve("")}; 
                     }
                     return response;
                 }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
                   .catch(err => {
                       console.error(`Error processing ${officialCsvPath}:`, err);
-                       tableErrorMessageDiv.innerHTML += `<p>Error processing official events file. Ensure it's correctly merged and not empty.</p>`;
+                       tableErrorMessageDiv.innerHTML += `<p>Error processing official events file. (Combined CSV may be empty or corrupt)</p>`;
                        tableErrorMessageDiv.classList.remove('hidden');
-                      return []; // Return empty array on error for this source
+                      return []; 
                   })
             ])
             .then(([privateEvents, officialEvents]) => {
                 allNormalizedEvents = privateEvents.concat(officialEvents);
                 console.log(`Total normalized events: ${allNormalizedEvents.length} (Private: ${privateEvents.length}, Official: ${officialEvents.length})`);
-                
+                                
                 if (allNormalizedEvents.length === 0) {
                      if (!tableErrorMessageDiv.classList.contains('hidden') && tableErrorMessageDiv.textContent.includes("Error")) {
-                        // Error already shown by fetch specific catches
+                        // Error already shown
                      } else {
                         tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/private_events.csv' and 'data/official_events_combined.csv' exist, contain data, and are correctly formatted.";
                         tableErrorMessageDiv.classList.remove('hidden');
                      }
-                     // Still try to initialize table with empty data so it doesn't break, but shows "No data" message.
-                     // $('#eventTable').html('<thead><tr><th>Info</th></tr></thead><tbody><tr><td>No data loaded. Check console and file paths.</td></tr></tbody>');
                 } else {
-                    tableErrorMessageDiv.classList.add('hidden'); // Hide error message if data is loaded
+                    tableErrorMessageDiv.classList.add('hidden');
                 }
-
 
                 let headerHtml = '<tr>';
                 UNIFIED_HEADERS.forEach(header => {
@@ -336,9 +340,9 @@
                          { targets: colIdx.DataSource, className: "dt-body-center", width: "10%" } 
                     ]
                 });
-                applyFilters(); // Apply initial default filters
+                applyFilters();
             })
-            .catch(error => { // This catch handles errors from Promise.all itself or unhandled rejections from fetches
+            .catch(error => { 
                 console.error('General error loading or processing CSV data:', error);
                 tableErrorMessageDiv.textContent = `General Error: ${error.message}. Check console and CSV files.`;
                 tableErrorMessageDiv.classList.remove('hidden');
@@ -357,11 +361,31 @@
                 const dataSourceColIdx = UNIFIED_HEADERS.indexOf("DataSource");
                 const weekdayColIdx = UNIFIED_HEADERS.indexOf("Weekday");
 
-                let sourceSearchTerm = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
-                eventDataTable.column(dataSourceColIdx).search(sourceSearchTerm, true, false);
+                if (dataSourceColIdx === -1 || weekdayColIdx === -1) {
+                    console.error("Could not find DataSource or Weekday column index. UNIFIED_HEADERS:", UNIFIED_HEADERS);
+                    return;
+                }
 
-                let daySearchTerm = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
-                eventDataTable.column(weekdayColIdx).search(daySearchTerm, true, false);
+                if (eventDataTable.rows().count() > 0) {
+                    try {
+                        const uniqueDataSources = eventDataTable.column(dataSourceColIdx).data().unique().toArray();
+                        console.log("DEBUG: Unique DataSource values in table before filtering:", uniqueDataSources);
+                    } catch(e) {
+                        console.warn("Could not get unique DataSource values for debugging.", e);
+                    }
+                } else {
+                    console.log("Table has no data when trying to log unique DataSource values.");
+                }
+
+                // Apply source filter using exact match regex, case-insensitive
+                let sourceSearchTermRegex = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
+                console.log(`Applying DataSource search with regex: '${sourceSearchTermRegex}' (case-insensitive) to column index ${dataSourceColIdx}`);
+                eventDataTable.column(dataSourceColIdx).search(sourceSearchTermRegex, true, false, true).draw(false); // regex=true, smart=false, caseInsensitive=true
+
+                // Apply day filter
+                let daySearchTermRegex = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
+                console.log(`Applying Weekday search with regex: '${daySearchTermRegex}' (case-insensitive) to column index ${weekdayColIdx}`);
+                eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); // Also make day filter case-insensitive
 
                 eventDataTable.draw(); 
                 console.log("Table redrawn with filters. Matching rows:", eventDataTable.rows({ search: 'applied' }).count());
