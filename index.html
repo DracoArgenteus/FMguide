@@ -70,7 +70,7 @@
         <div id="instructions" class="mb-4 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow">
             <h2 class="text-xl font-semibold text-blue-700 mb-3">How to Use This Page</h2>
             <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist.</li>
+                <li>Ensure `data/folkemoedet_private_events.csv` and `data/official_events_combined.csv` exist and are correctly populated.</li>
                 <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
                 <li>Use the "Day" buttons to filter by weekday.</li>
                 <li>Click on truncated descriptions or links for more details.</li>
@@ -120,44 +120,37 @@
     <script>
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
-        // Column names for the final unified table (adjust order as needed)
         const UNIFIED_HEADERS = [
             "EventTitle", "Weekday", "TimeRange", "Location", 
             "Description", "EventURL", "Organizers", "Theme", "DataSource" 
-            // "OriginalSourceDoc" // Kept out for now for brevity, can be added
         ];
         
-        // Mapping from private CSV headers to unified headers
         const privateDataMap = {
             "EventTitle": "EventTitle", "Weekday": "Weekday", "Time": "TimeRange", "Location": "Location",
             "EventDescription": "Description", "EventLink": "EventURL", 
             "ResponsibleOrganizer": "Organizers", "SourceDocument": "OriginalSourceDoc" 
         };
 
-        // Mapping from official CSV headers to unified headers
         const officialDataMap = {
-            "title": "EventTitle", "day_date": "_FullDate", // Will be processed to Weekday
-            "startTime": "_StartTime", "endTime": "_EndTime", // Will be combined into TimeRange
+            "title": "EventTitle", "day_date": "_FullDate", 
+            "startTime": "_StartTime", "endTime": "_EndTime", 
             "location": "Location", "summary": "Description", "url": "EventURL",
             "organizers": "Organizers", "theme": "Theme"
         };
-
 
         $(document).ready(function() {
             const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
             let eventDataTable = null;
-            let allNormalizedEvents = []; // Will hold combined, normalized data
+            let allNormalizedEvents = []; 
 
-            // Modal elements
             const modal = document.getElementById('descriptionModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalFullDescription = document.getElementById('modalFullDescription');
             const closeModalButton = document.getElementById('closeModalButton');
 
             function robustParseCSV(csvText) {
-                // ... (same robustParseCSV function as before)
                 const lines = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
                 if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === "")) {
                     return { headers: [], data: [] };
@@ -186,7 +179,7 @@
                 return { headers, data };
             }
 
-            function formatTime(ptTime) { // PT9H30M -> 09:30
+            function formatTime(ptTime) { 
                 if (!ptTime || !ptTime.startsWith('PT')) return '';
                 let hours = '00', minutes = '00';
                 const H_match = ptTime.match(/(\d+)H/);
@@ -196,19 +189,26 @@
                 return `${hours}:${minutes}`;
             }
 
-            function dayDateToWeekday(dateString) { // "2025-06-12" -> "Torsdag"
+            function dayDateToWeekday(dateString) { 
                 if (!dateString) return '';
-                const date = new Date(dateString + 'T00:00:00'); // Ensure local interpretation
-                const weekdays = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
-                return weekdays[date.getDay()];
+                try {
+                    const date = new Date(dateString + 'T00:00:00Z'); // Use Z for UTC to avoid DST issues in conversion
+                    if (isNaN(date.getDay())) { // Check if date is valid
+                        console.warn("Invalid date string for dayDateToWeekday:", dateString);
+                        return 'Invalid Date';
+                    }
+                    const weekdays = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"];
+                    return weekdays[date.getDay()];
+                } catch (e) {
+                    console.warn("Error parsing date in dayDateToWeekday:", dateString, e);
+                    return 'Date Error';
+                }
             }
 
             function normalizeData(rawData, sourceName, map) {
                 return rawData.map(rawEvent => {
                     const normalizedEvent = { DataSource: sourceName };
-                    for (const unifiedHeader of UNIFIED_HEADERS) {
-                        normalizedEvent[unifiedHeader] = ''; // Initialize all unified headers
-                    }
+                    UNIFIED_HEADERS.forEach(header => normalizedEvent[header] = ''); // Initialize
                     
                     for (const rawHeader in map) {
                         const unifiedHeader = map[rawHeader];
@@ -217,7 +217,6 @@
                         }
                     }
 
-                    // Specific transformations for official data
                     if (sourceName === "Official") {
                         normalizedEvent.Weekday = dayDateToWeekday(normalizedEvent._FullDate);
                         const startTimeFormatted = formatTime(normalizedEvent._StartTime);
@@ -226,55 +225,47 @@
                             normalizedEvent.TimeRange = `${startTimeFormatted}-${endTimeFormatted}`;
                         } else if (startTimeFormatted) {
                             normalizedEvent.TimeRange = startTimeFormatted;
-                        } else {
-                            normalizedEvent.TimeRange = '';
                         }
-                        // Clean up temp fields
-                        delete normalizedEvent._FullDate;
-                        delete normalizedEvent._StartTime;
-                        delete normalizedEvent._EndTime;
+                        delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
                     }
-                    
-                    // Ensure all unified headers exist, even if empty
-                    UNIFIED_HEADERS.forEach(uh => {
-                        if (!(uh in normalizedEvent)) {
-                            normalizedEvent[uh] = '';
-                        }
-                    });
                     return normalizedEvent;
                 });
             }
 
             Promise.all([
                 fetch(privateCsvPath).then(response => {
-                    if (!response.ok) throw new Error(`Failed to load ${privateCsvPath}: ${response.statusText}`);
-                    return response.text();
-                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap)),
+                    if (!response.ok) { console.error(`Failed to load ${privateCsvPath}`); return {text: () => Promise.resolve("")}; } // Return empty if fail
+                    return response;
+                }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Private", privateDataMap)),
+                
                 fetch(officialCsvPath).then(response => {
-                    if (!response.ok) throw new Error(`Failed to load ${officialCsvPath}: ${response.statusText}`);
-                    return response.text();
-                }).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
+                    if (!response.ok) { console.error(`Failed to load ${officialCsvPath}`); return {text: () => Promise.resolve("")}; } // Return empty if fail
+                    return response;
+                }).then(response => response.text()).then(csvText => normalizeData(robustParseCSV(csvText).data, "Official", officialDataMap))
             ])
             .then(([privateEvents, officialEvents]) => {
                 allNormalizedEvents = privateEvents.concat(officialEvents);
                 console.log(`Total normalized events: ${allNormalizedEvents.length} (Private: ${privateEvents.length}, Official: ${officialEvents.length})`);
                 
-                if (allNormalizedEvents.length === 0) {
-                     tableErrorMessageDiv.textContent = "No event data loaded. Check CSV files in 'data/' folder.";
+                if (allNormalizedEvents.length === 0 && (privateEvents.length > 0 || officialEvents.length > 0)) {
+                    // This case implies data was loaded but normalization might have issues or filtering is too strict initially
+                    console.warn("Data was loaded but allNormalizedEvents is empty. Check normalization logic or if any events matched initial filters.");
+                } else if (allNormalizedEvents.length === 0) {
+                     tableErrorMessageDiv.textContent = "No event data loaded. Ensure 'data/private_events.csv' and 'data/official_events_combined.csv' exist and contain data.";
                      tableErrorMessageDiv.classList.remove('hidden');
-                     return;
+                     return; // Stop if no data at all
                 }
+
 
                 tableErrorMessageDiv.classList.add('hidden');
 
                 let headerHtml = '<tr>';
                 UNIFIED_HEADERS.forEach(header => {
-                    headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header.replace(/([A-Z])/g, ' $1').trim()}</th>`; // Add spaces to camelCase
+                    headerHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header.replace(/([A-Z])/g, ' $1').trim()}</th>`;
                 });
                 headerHtml += '</tr>';
                 $('#eventTable thead').html(headerHtml);
 
-                // Define column indices dynamically
                 const colIdx = {};
                 UNIFIED_HEADERS.forEach((header, i) => colIdx[header] = i);
 
@@ -283,8 +274,8 @@
                     responsive: true,
                     lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]],
                     pageLength: 25,
-                    language: { search: "_INPUT_", searchPlaceholder: "Search all fields...", lengthMenu: "Show _MENU_ entries", zeroRecords: "No matching events found", emptyTable: "No events loaded or selected" },
-                    order: [[colIdx.Weekday, 'asc'], [colIdx.TimeRange, 'asc']], // Sort by Weekday, then TimeRange
+                    language: { search: "_INPUT_", searchPlaceholder: "Search all fields...", lengthMenu: "Show _MENU_ entries", zeroRecords: "No matching events found for the current filters.", emptyTable: "No events loaded or selected for display." },
+                    order: [[colIdx.Weekday, 'asc'], [colIdx.TimeRange, 'asc']], 
                     columnDefs: [ 
                         { width: '10%', targets: colIdx.Weekday },
                         { width: '10%', targets: colIdx.TimeRange },
@@ -316,39 +307,41 @@
                             } return data || ''; 
                           }
                         },
-                         { targets: colIdx.DataSource, className: "dt-body-center", width: "10%" } // Center DataSource column
+                         { targets: colIdx.DataSource, className: "dt-body-center", width: "10%" } 
                     ]
                 });
+                // Apply initial filters once table is drawn
+                applyFilters();
             })
             .catch(error => {
-                console.error('Error loading or processing CSV data:', error);
-                tableErrorMessageDiv.textContent = `Error loading data: ${error.message}. Please ensure 'data/private_events.csv' and 'data/official_events_combined.csv' exist and are correctly formatted.`;
+                console.error('Error in Promise.all for loading CSV data:', error);
+                tableErrorMessageDiv.textContent = `Error loading data: ${error.message}. Check CSV files and paths.`;
                 tableErrorMessageDiv.classList.remove('hidden');
             });
 
-            // --- Filter Logic ---
             let currentSourceFilter = "All";
             let currentDayFilter = "All";
 
             function applyFilters() {
-                if (!eventDataTable) return;
+                if (!eventDataTable) {
+                    console.log("DataTable not initialized yet. Skipping applyFilters.");
+                    return;
+                }
                 console.log(`Applying filters - Source: ${currentSourceFilter}, Day: ${currentDayFilter}`);
                 
-                // DataSource filter (using the 'DataSource' column index)
                 const dataSourceColIdx = UNIFIED_HEADERS.indexOf("DataSource");
-                if (currentSourceFilter === "All") {
-                    eventDataTable.column(dataSourceColIdx).search('').draw(false); // false to not reset pagination if other filters change
-                } else {
-                    eventDataTable.column(dataSourceColIdx).search('^' + currentSourceFilter + '$', true, false).draw(false);
-                }
-
-                // Weekday filter (using the 'Weekday' column index)
                 const weekdayColIdx = UNIFIED_HEADERS.indexOf("Weekday");
-                if (currentDayFilter === "All") {
-                     eventDataTable.column(weekdayColIdx).search('').draw();
-                } else {
-                     eventDataTable.column(weekdayColIdx).search('^' + currentDayFilter + '$', true, false).draw();
-                }
+
+                // Apply source filter
+                let sourceSearchTerm = (currentSourceFilter === "All") ? '' : '^' + currentSourceFilter + '$';
+                eventDataTable.column(dataSourceColIdx).search(sourceSearchTerm, true, false); // Regex true, smart search false
+
+                // Apply day filter
+                let daySearchTerm = (currentDayFilter === "All") ? '' : '^' + currentDayFilter + '$';
+                eventDataTable.column(weekdayColIdx).search(daySearchTerm, true, false);
+
+                eventDataTable.draw(); // Single draw after all search terms are set
+                 console.log("Table redrawn with filters.");
             }
 
             $('.source-filter-buttons button').on('click', function() {
@@ -365,11 +358,9 @@
                 applyFilters();
             });
 
-            // Modal open functionality for descriptions
             $('#eventTable tbody').on('click', 'span.truncate-text', function () {
                 const fullText = $(this).data('fulltext');
                 const rowDataArray = eventDataTable.row($(this).closest('tr')).data();
-                // Construct title from the row data using unified headers
                 const titleColIdx = UNIFIED_HEADERS.indexOf("EventTitle");
                 const eventTitleForRow = rowDataArray[titleColIdx] || "Event Details";
                 
