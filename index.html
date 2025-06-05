@@ -137,9 +137,14 @@
         const officialDataMap = {
             "title": "EventTitle", "day_date": "_FullDate", 
             "startTime": "_StartTime", "endTime": "_EndTime", 
-            "location": "Location", "summary": "Description", "url": "EventURL",
+            "location": "Location", "summary": "Description", 
+            // No direct 'url' anymore, we added specific parts
+            "eventYear": "_OfficialYear", 
+            "eventCrmId": "_OfficialCrmId", 
+            "eventSlug": "_OfficialSlug",
             "organizers": "Organizers", "theme": "Theme"
         };
+
 
         $(document).ready(function() {
             const privateCsvPath = 'data/folkemoedet_private_events.csv'; 
@@ -275,11 +280,16 @@
                         } else if (startTimeFormatted) {
                             normalizedEvent.TimeRange = startTimeFormatted;
                         }
+                        // Construct EventURL from parts
+                        if (normalizedEvent._OfficialYear && normalizedEvent._OfficialCrmId && normalizedEvent._OfficialSlug) {
+                            normalizedEvent.EventURL = `https://programoversigt.folkemoedet.dk/events/${normalizedEvent._OfficialYear}/${normalizedEvent._OfficialCrmId}/${normalizedEvent._OfficialSlug}`;
+                        }
                         delete normalizedEvent._FullDate; delete normalizedEvent._StartTime; delete normalizedEvent._EndTime;
+                        delete normalizedEvent._OfficialYear; delete normalizedEvent._OfficialCrmId; delete normalizedEvent._OfficialSlug;
                     }
                     
                     if (index < 1) { 
-                        console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', Title: '${normalizedEvent.EventTitle}', Weekday: '${normalizedEvent.Weekday}'`);
+                        console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', EventURL: '${normalizedEvent.EventURL}'`);
                     }
                     return normalizedEvent;
                 });
@@ -375,15 +385,15 @@
                           }
                         },
                         { 
-                            width: '20%', // Adjusted width for Description column
+                            width: '20%', 
                             targets: colIdx.Description, 
                             render: function (data, type, row, meta) {
                                 if (type === 'display' && data) {
                                     const fullText = data; 
-                                    const maxLength = 40; // Max characters to show in table (can be adjusted)
+                                    const maxLength = 40; 
                                     if (fullText.length > maxLength) {
                                         const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                                        return `<span class="truncate-text" style="max-width: 200px;" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; // Inline max-width for span if needed
+                                        return `<span class="truncate-text" style="max-width: 200px;" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; 
                                     }
                                 } return data || ''; 
                             }
