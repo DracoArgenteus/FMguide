@@ -38,10 +38,10 @@ jobs:
       - name: Run CSV Merge Script
         run: |
           echo "Running Python script to merge CSV files..."
-          # This assumes merge_csvs.py is in the repo root and is written
+          # This assumes merge_csvs.py is in the repo scripts/ subdirectory and is written
           # to handle input/output within a 'data/' subdirectory.
           # For example, your Python script should set its source_dir = "data"
-          python merge_csvs.py 
+          python ./scripts/merge_csvs.py 
         # The Python script is expected to create/update 'data/official_events_combined.csv'
 
       - name: Commit and push changes
