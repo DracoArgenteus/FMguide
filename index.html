@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Folkemødet 2025 - Combined Event Schedule</title>
+    <title>Folkemødet 2025 - Combined Event Schedule with Stats</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- jQuery -->
@@ -12,8 +12,28 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <!-- DataTables JS -->
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; display: flex; } /* Flex for side panel */
+        .main-content { flex-grow: 1; /* Main content takes up available space */ }
+        .side-panel {
+            width: 300px; /* Adjust as needed */
+            min-width: 250px;
+            max-width: 350px;
+            padding: 1rem;
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            border-left: 1px solid #e5e7eb; /* Tailwind gray-200 */
+            overflow-y: auto;
+            height: 100vh; /* Full viewport height */
+            position: sticky; /* Sticky positioning */
+            top: 0;
+        }
+        @media (max-width: 1024px) { /* On smaller screens, stack them or hide side panel */
+            body { flex-direction: column; }
+            .side-panel { width: 100%; height: auto; max-height: 50vh; position: static; border-left: none; border-top: 1px solid #e5e7eb;}
+        }
+
         .dataTables_wrapper .dataTables_length,
         .dataTables_wrapper .dataTables_filter { margin-bottom: 1rem; }
         .dataTables_wrapper .dataTables_info,
@@ -43,7 +63,7 @@
         }
 
         .truncate-text {
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; /* max-width is now controlled by columnDef */
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
             cursor: pointer; color: #2563eb; text-decoration: underline; text-decoration-style: dotted;
         }
         .truncate-text:hover { color: #1d4ed8; }
@@ -58,11 +78,12 @@
         .close-button { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
         .close-button:hover { background-color: #dc2626; }
         #dataFreshness { font-size: 0.875rem; color: #4b5563; margin-top: -0.5rem; margin-bottom: 1rem; }
+        .chart-container { margin-bottom: 2rem; }
+        .chart-container h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 p-4 md:p-8">
-
-    <div class="container mx-auto max-w-7xl">
+<body class="bg-gray-100">
+    <div class="main-content p-4 md:p-8">
         <header class="mb-8 text-center">
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600">Folkemødet 2025 - Combined Event Schedule</h1>
             <p id="dataFreshness" class="text-gray-600">Loading data update time...</p>
@@ -76,6 +97,7 @@
                 <li>Use the "Source" buttons to switch between Official, Private, or All events.</li>
                 <li>Use the "Day" buttons to filter by weekday.</li>
                 <li>Click on truncated descriptions or links for more details.</li>
+                <li>Statistics in the side panel update based on your filters.</li>
             </ol>
         </div>
         
@@ -110,6 +132,19 @@
         </footer>
     </div>
 
+    <div class="side-panel">
+        <h3 class="text-xl font-bold text-blue-600 mb-4">Event Statistics</h3>
+        <div class="chart-container">
+            <h4>Events per Hour</h4>
+            <canvas id="eventsPerHourChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h4>Events per Theme (Top 10)</h4>
+            <canvas id="eventsPerThemeChart"></canvas>
+        </div>
+    </div>
+
+
     <!-- Modal Structure -->
     <div id="descriptionModal" class="modal">
         <div class="modal-content">
@@ -138,13 +173,9 @@
             "title": "EventTitle", "day_date": "_FullDate", 
             "startTime": "_StartTime", "endTime": "_EndTime", 
             "location": "Location", "summary": "Description", 
-            // No direct 'url' anymore, we added specific parts
-            "eventYear": "_OfficialYear", 
-            "eventCrmId": "_OfficialCrmId", 
-            "eventSlug": "_OfficialSlug",
+            "eventYear": "_OfficialYear", "eventCrmId": "_OfficialCrmId", "eventSlug": "_OfficialSlug",
             "organizers": "Organizers", "theme": "Theme"
         };
-
 
         $(document).ready(function() {
             const privateCsvPath = 'data/folkemoedet_private_events.csv'; 
@@ -160,7 +191,12 @@
             const modalFullDescription = document.getElementById('modalFullDescription');
             const closeModalButton = document.getElementById('closeModalButton');
 
+            // Chart instances
+            let eventsPerHourChartInstance = null;
+            let eventsPerThemeChartInstance = null;
+
             function robustParseCSV(csvText) {
+                // ... (robustParseCSV function from previous version - unchanged)
                 const data = [];
                 let headers = [];
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -280,7 +316,6 @@
                         } else if (startTimeFormatted) {
                             normalizedEvent.TimeRange = startTimeFormatted;
                         }
-                        // Construct EventURL from parts
                         if (normalizedEvent._OfficialYear && normalizedEvent._OfficialCrmId && normalizedEvent._OfficialSlug) {
                             normalizedEvent.EventURL = `https://programoversigt.folkemoedet.dk/events/${normalizedEvent._OfficialYear}/${normalizedEvent._OfficialCrmId}/${normalizedEvent._OfficialSlug}`;
                         }
@@ -289,7 +324,7 @@
                     }
                     
                     if (index < 1) { 
-                        console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', EventURL: '${normalizedEvent.EventURL}'`);
+                        // console.log(`Normalized event sample from ${sourceName}. DataSource: '${normalizedEvent.DataSource}', EventURL: '${normalizedEvent.EventURL}'`);
                     }
                     return normalizedEvent;
                 });
@@ -387,13 +422,15 @@
                         { 
                             width: '20%', 
                             targets: colIdx.Description, 
+                            className: 'truncate-text-container', // Add a class to the <td>
                             render: function (data, type, row, meta) {
                                 if (type === 'display' && data) {
                                     const fullText = data; 
                                     const maxLength = 40; 
+                                    // The max-width for truncation will be handled by CSS on the td/span
                                     if (fullText.length > maxLength) {
                                         const escapedFullText = fullText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                                        return `<span class="truncate-text" style="max-width: 200px;" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; 
+                                        return `<span class="truncate-text" title="Click to read more" data-fulltext="${escapedFullText}">${fullText.substring(0, maxLength)}...</span>`; 
                                     }
                                 } return data || ''; 
                             }
@@ -408,19 +445,25 @@
                          { targets: colIdx.DataSource, className: "dt-body-center", width: "10%" } 
                     ]
                 });
-                applyFilters();
+                // Initialize charts and setup draw listener
+                initializeCharts();
+                eventDataTable.on('draw.dt', updateVisualizations);
+                updateVisualizations(); // Initial draw
+
             })
             .catch(error => { 
                 console.error('General error loading or processing CSV data:', error);
                 tableErrorMessageDiv.textContent = `General Error: ${error.message}. Check console and CSV files.`;
                 tableErrorMessageDiv.classList.remove('hidden');
-                 dataFreshnessElement.textContent = "Could not determine data update time.";
+                dataFreshnessElement.textContent = "Could not determine data update time.";
             });
 
+            // --- Filter Logic ---
             let currentSourceFilter = "All";
             let currentDayFilter = "All";
 
             function applyFilters() {
+                // ... (applyFilters function remains the same as previous version)
                 if (!eventDataTable) {
                     console.log("DataTable not initialized yet. Skipping applyFilters.");
                     return;
@@ -453,7 +496,7 @@
                 eventDataTable.column(weekdayColIdx).search(daySearchTermRegex, true, false, true); 
 
                 eventDataTable.draw(); 
-                console.log("Table redrawn with filters. Matching rows:", eventDataTable.rows({ search: 'applied' }).count());
+                // Note: updateVisualizations will be called by the 'draw.dt' event
             }
 
             $('.source-filter-buttons button').on('click', function() {
@@ -470,7 +513,9 @@
                 applyFilters();
             });
 
+            // --- Modal Logic ---
             $('#eventTable tbody').on('click', 'span.truncate-text', function () {
+                // ... (modal logic remains the same)
                 const fullText = $(this).data('fulltext');
                 const rowDataArray = eventDataTable.row($(this).closest('tr')).data();
                 const titleColIdx = UNIFIED_HEADERS.indexOf("EventTitle");
@@ -483,6 +528,74 @@
 
             closeModalButton.onclick = function() { modal.style.display = "none"; }
             window.onclick = function(event) { if (event.target == modal) { modal.style.display = "none"; } }
+
+            // --- Charting Logic ---
+            function initializeCharts() {
+                const hourCtx = document.getElementById('eventsPerHourChart').getContext('2d');
+                eventsPerHourChartInstance = new Chart(hourCtx, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{ label: 'Events per Hour', data: [], backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1 }] },
+                    options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true, maintainAspectRatio: false }
+                });
+
+                const themeCtx = document.getElementById('eventsPerThemeChart').getContext('2d');
+                eventsPerThemeChartInstance = new Chart(themeCtx, {
+                    type: 'bar',
+                    data: { labels: [], datasets: [{ label: 'Events per Theme', data: [], backgroundColor: 'rgba(75, 192, 192, 0.6)', borderColor: 'rgba(75, 192, 192, 1)', borderWidth: 1 }] },
+                    options: { indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            function updateVisualizations() {
+                if (!eventDataTable || !eventsPerHourChartInstance || !eventsPerThemeChartInstance) {
+                    console.log("DataTable or charts not ready for visualization update.");
+                    return;
+                }
+                console.log("Updating visualizations...");
+
+                const filteredData = eventDataTable.rows({ search: 'applied' }).data().toArray();
+                const timeRangeColIdx = UNIFIED_HEADERS.indexOf("TimeRange");
+                const themeColIdx = UNIFIED_HEADERS.indexOf("Theme");
+
+                // --- Events per Hour Data ---
+                const hourlyCounts = {};
+                for (let i = 0; i < 24; i++) { hourlyCounts[i.toString().padStart(2, '0')] = 0; } // Initialize 00-23
+
+                filteredData.forEach(row => {
+                    const timeRange = row[timeRangeColIdx]; // e.g., "09:00" or "10:00-11:45"
+                    if (timeRange) {
+                        const startTimeMatch = timeRange.match(/^(\d{2}):\d{2}/); // Get start hour
+                        if (startTimeMatch) {
+                            const hour = startTimeMatch[1];
+                            if (hourlyCounts.hasOwnProperty(hour)) {
+                                hourlyCounts[hour]++;
+                            }
+                        }
+                    }
+                });
+                eventsPerHourChartInstance.data.labels = Object.keys(hourlyCounts);
+                eventsPerHourChartInstance.data.datasets[0].data = Object.values(hourlyCounts);
+                eventsPerHourChartInstance.update();
+
+                // --- Events per Theme Data ---
+                const themeCounts = {};
+                filteredData.forEach(row => {
+                    const theme = row[themeColIdx] ? row[themeColIdx].trim() : "N/A";
+                    if (theme) {
+                        themeCounts[theme] = (themeCounts[theme] || 0) + 1;
+                    }
+                });
+                
+                // Sort themes by count, take top 10
+                const sortedThemes = Object.entries(themeCounts)
+                                      .sort(([,a],[,b]) => b-a)
+                                      .slice(0, 10);
+
+                eventsPerThemeChartInstance.data.labels = sortedThemes.map(entry => entry[0]);
+                eventsPerThemeChartInstance.data.datasets[0].data = sortedThemes.map(entry => entry[1]);
+                eventsPerThemeChartInstance.update();
+                console.log("Visualizations updated.");
+            }
         });
     </script>
 </body>
