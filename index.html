@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class=""> <!-- `dark` class will be added here by JS -->
+<html lang="en" class=""> <!-- `dark` class is toggled here by JS -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,13 +10,13 @@
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        /* Base styles for DataTables to integrate with Tailwind theming */
+        /* Custom CSS to style DataTables elements to match Tailwind's dark theme */
         table.dataTable {
             border-collapse: collapse !important;
-            border-color: #e5e7eb; /* Tailwind gray-200 */
+            border-color: #e5e7eb; /* gray-200 */
         }
         .dark table.dataTable {
-            border-color: #4b5563; /* Tailwind gray-600 */
+            border-color: #4b5563; /* gray-600 */
         }
         
         table.dataTable thead th, table.dataTable tbody td {
@@ -37,18 +37,23 @@
         }
         
         .invitation-only {
-            background-color: rgba(254, 249, 195, 0.7) !important; /* Tailwind yellow-100/70% */
+            background-color: rgba(254, 249, 195, 0.7) !important; /* yellow-100/70% */
         }
         .invitation-only:hover {
-            background-color: rgba(254, 240, 138, 0.7) !important; /* Tailwind yellow-200/70% */
+            background-color: rgba(254, 240, 138, 0.7) !important; /* yellow-200/70% */
         }
         .dark .invitation-only {
-             background-color: rgba(161, 98, 7, 0.25) !important; /* Tailwind amber-700/25% */
+             background-color: rgba(161, 98, 7, 0.25) !important; /* amber-700/25% */
         }
         .dark .invitation-only:hover {
-            background-color: rgba(161, 98, 7, 0.35) !important; /* Tailwind amber-700/35% */
+            background-color: rgba(161, 98, 7, 0.35) !important; /* amber-700/35% */
         }
 
+        /* Transition for stats section */
+        #statsSectionContainer {
+            transition: max-height 0.7s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
@@ -58,27 +63,23 @@
             <p id="dataFreshness" class="text-gray-500 dark:text-gray-400 text-sm mt-2">Loading data update time...</p>
         </header>
 
-        <div id="top-controls" class="flex justify-end items-center gap-4 mb-4">
-            <button id="toggleStatsButton" class="control-button flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+        <div class="flex justify-end items-center gap-4 mb-4">
+            <button id="toggleStatsButton" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1V2z"/></svg>
                 <span id="toggleStatsButtonText">Show Statistics</span>
             </button>
-            <button id="theme-toggle" class="control-button flex items-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <button id="theme-toggle" class="flex items-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <svg id="theme-toggle-dark-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
                 <svg id="theme-toggle-light-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm-.707 8.486a1 1 0 011.414 0l.707-.707a1 1 0 111.414 1.414l-.707.707a1 1 0 01-1.414 0zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
             </button>
         </div>
 
-        <div id="statsSectionContainer" class="mb-6 hidden bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md transition-all duration-500 ease-in-out max-h-0 opacity-0 overflow-hidden">
-            <h3 class="text-xl font-bold text-blue-600 dark:text-blue-500 mb-4 text-center">Event Statistics</h3>
-            <div class="charts-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="chart-wrapper min-h-[300px]">
-                    <h4 class="text-lg font-semibold mb-2 text-center text-gray-700 dark:text-gray-300">Events per Hour</h4>
-                    <canvas id="eventsPerHourChart"></canvas>
-                </div>
-                <div class="chart-wrapper min-h-[300px]">
-                    <h4 class="text-lg font-semibold mb-2 text-center text-gray-700 dark:text-gray-300">Events per Theme (Top 10)</h4>
-                    <canvas id="eventsPerThemeChart"></canvas>
+        <div id="statsSectionContainer" class="mb-6 hidden max-h-0 opacity-0 bg-white dark:bg-gray-800 p-0 rounded-lg shadow-md">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-blue-600 dark:text-blue-500 mb-4 text-center">Event Statistics</h3>
+                <div class="charts-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-wrapper min-h-[300px]"><canvas id="eventsPerHourChart"></canvas></div>
+                    <div class="chart-wrapper min-h-[300px]"><canvas id="eventsPerThemeChart"></canvas></div>
                 </div>
             </div>
         </div>
@@ -86,10 +87,10 @@
         <div id="tableErrorMessage" class="hidden error-message"></div>
         
         <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-4">
                 <div>
                     <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Source:</h3>
-                    <div class="source-filter-buttons">
+                    <div class="source-filter-buttons flex flex-wrap gap-2">
                         <button data-source="All" class="active-filter">All Sources</button>
                         <button data-source="Official">Official Program</button>
                         <button data-source="Private">Private List</button>
@@ -98,7 +99,7 @@
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Day:</h3>
-                    <div class="filter-buttons">
+                    <div class="filter-buttons flex flex-wrap gap-2">
                         <button data-day="All" class="active-filter">All Days</button>
                         <button data-day="Onsdag">Onsdag</button>
                         <button data-day="Torsdag">Torsdag</button>
@@ -121,7 +122,6 @@
         </footer>
     </div>
 
-    <!-- Modal Structure -->
     <div id="descriptionModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
         <div class="modal-content bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl m-4">
             <div class="modal-header flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
@@ -144,6 +144,7 @@
 
 
         $(document).ready(function() {
+            // ... (All previous JS variables and functions remain here)
             const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             const socialCsvPath = 'data/social_events.csv';
@@ -163,7 +164,6 @@
             const closeModalButton = document.getElementById('closeModalButton');
             let eventsPerHourChartInstance = null;
             let eventsPerThemeChartInstance = null;
-
             // --- THEME SWITCHER LOGIC ---
             const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
             const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
@@ -198,9 +198,8 @@
             });
             // --- END THEME LOGIC ---
 
-            // --- DATA PROCESSING LOGIC ---
             function robustParseCSV(csvText) {
-                // ... same robust parser from previous version ...
+                // ... same robust parser ...
                 const data = []; let headers = [];
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 const lines = []; let inQuotes = false; let currentLine = "";
@@ -257,7 +256,7 @@
             }
 
             function normalizeData(rawData, sourceName, map) {
-                // ... same normalization logic from previous version, including Social theme assignment ...
+                // ... same normalization logic ...
                 return rawData.map((rawEvent) => { 
                     const normalizedEvent = { DataSource: sourceName }; 
                     UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
@@ -292,7 +291,6 @@
                 fetch(socialCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${socialCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error social events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Social",socialDataMap)).catch(e=>{console.error(`Proc fail ${socialCsvPath}:`,e); return[];})
             ])
             .then(([privateEvents, officialEvents, socialEvents]) => {
-                // ... (same data processing and table initialization as before) ...
                 const validDates = lastModifiedTimestamps.filter(d => d).map(d => new Date(d));
                 dataFreshnessElement.textContent = validDates.length > 0 ? `Data last updated: ${new Date(Math.max.apply(null,validDates)).toLocaleString()} (${timeAgo(new Date(Math.max.apply(null,validDates)))})` : "Data update time: Not available";
                 allNormalizedEvents = [...privateEvents, ...officialEvents, ...socialEvents];
@@ -342,26 +340,52 @@
 
             function initializeCharts() {
                 // ... same chart init logic
+                const hctx = document.getElementById('eventsPerHourChart');
+                const tctx = document.getElementById('eventsPerThemeChart');
+                if (!hctx || !tctx) { console.warn("Chart canvas elements not found!"); return; }
+                eventsPerHourChartInstance = new Chart(hctx.getContext('2d'), {type:'bar',data:{labels:[],datasets:[{label:'Events/Hour',data:[],backgroundColor:'rgba(54,162,235,0.7)',borderColor:'rgba(54,162,235,1)',borderWidth:1}]},options:{scales:{y:{beginAtZero:true,ticks:{stepSize:1, precision:0}}},responsive:true,maintainAspectRatio:true}});
+                eventsPerThemeChartInstance = new Chart(tctx.getContext('2d'), {type:'bar',data:{labels:[],datasets:[{label:'Events/Theme',data:[],backgroundColor:'rgba(75,192,192,0.7)',borderColor:'rgba(75,192,192,1)',borderWidth:1}]},options:{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{stepSize:1, precision:0}}},responsive:true,maintainAspectRatio:true}});
             }
             function updateVisualizations() {
                 // ... same chart update logic
+                if(!eventDataTable||!eventsPerHourChartInstance||!eventsPerThemeChartInstance) return;
+                const fData = eventDataTable.rows({search:'applied'}).data().toArray();
+                const trIdx=UNIFIED_HEADERS.indexOf("TimeRange"), thIdx=UNIFIED_HEADERS.indexOf("Theme");
+                const hrCnt={}; for(let i=6;i<24;i++)hrCnt[i.toString().padStart(2,'0')]=0; 
+                fData.forEach(r=>{const tr=r[trIdx];if(tr){const sm=tr.match(/^(\d{2}):\d{2}/);if(sm)if(hrCnt.hasOwnProperty(sm[1]))hrCnt[sm[1]]++;}});
+                eventsPerHourChartInstance.data.labels=Object.keys(hrCnt).sort(); eventsPerHourChartInstance.data.datasets[0].data=Object.keys(hrCnt).sort().map(key => hrCnt[key]); eventsPerHourChartInstance.update();
+                
+                const thCnt={}; fData.forEach(r=>{const th=r[thIdx]?r[thIdx].trim():"N/A";if(th&&th!=="N/A"&&th.trim()!=='')thCnt[th]=(thCnt[th]||0)+1;}); 
+                const sThemes=Object.entries(thCnt).sort(([,a],[,b])=>b-a).slice(0,10);
+                eventsPerThemeChartInstance.data.labels=sThemes.map(e=>e[0]); eventsPerThemeChartInstance.data.datasets[0].data=sThemes.map(e=>e[1]); eventsPerThemeChartInstance.update();
             }
 
             // Toggle Stats Section Logic
             toggleStatsButton.addEventListener('click', () => {
                 const statsSection = document.getElementById('statsSectionContainer');
-                statsSection.classList.toggle('hidden');
-                statsSection.classList.toggle('max-h-0');
-                statsSection.classList.toggle('opacity-0');
-                const buttonText = document.getElementById('toggleStatsButtonText');
-                buttonText.textContent = statsSection.classList.contains('hidden') ? "Show Statistics" : "Hide Statistics";
+                const isHidden = statsSection.classList.contains('hidden');
+                
+                if (isHidden) {
+                    statsSection.classList.remove('hidden');
+                    // We need to wait for the 'hidden' class to be removed before setting max-height
+                    requestAnimationFrame(() => {
+                        statsSection.classList.remove('max-h-0', 'opacity-0');
+                    });
+                } else {
+                    statsSection.classList.add('max-h-0', 'opacity-0');
+                    statsSection.addEventListener('transitionend', () => {
+                        statsSection.classList.add('hidden');
+                    }, { once: true });
+                }
 
-                if (!statsSection.classList.contains('hidden')) { 
+                toggleStatsButtonText.textContent = isHidden ? "Hide Statistics" : "Show Statistics";
+
+                if (isHidden) { 
                     setTimeout(() => { 
                         if (eventsPerHourChartInstance) eventsPerHourChartInstance.resize();
                         if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.resize();
                         updateVisualizations(); 
-                    }, 50); 
+                    }, 500); // Wait for transition to finish
                 }
             });
 
