@@ -21,8 +21,8 @@
 
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #f3f4f6; /* Tailwind gray-100 */
-            color: #1f2937; /* Tailwind gray-800 */
+            background-color: #f3f4f6;
+            color: #1f2937;
         }
         @media (prefers-color-scheme: dark) {
             body { background-color: #111827; color: #d1d5db; }
@@ -188,7 +188,8 @@
 
 
         $(document).ready(function() {
-            const privateCsvPath = 'data/folkemoedet_private_events_v2.csv'; // Keeping internal name to avoid re-upload
+            // Reverted privateCsvPath back to the correct, non-v2 filename
+            const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             const socialCsvPath = 'data/social_events.csv';
             
