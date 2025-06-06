@@ -36,28 +36,29 @@
             border: 1px solid transparent;
         }
         
-        .invitation-only {
-            background-color: rgba(254, 249, 195, 0.7) !important; /* yellow-100/70% */
+        /* Invitation-only row highlighting */
+        tr.invitation-only {
+            background-color: rgba(254, 249, 195, 0.7) !important; /* Tailwind yellow-100/70% */
         }
-        .invitation-only:hover {
-            background-color: rgba(254, 240, 138, 0.7) !important; /* yellow-200/70% */
+        tr.invitation-only:hover {
+            background-color: rgba(254, 240, 138, 0.7) !important; /* Tailwind yellow-200/70% */
         }
-        .dark .invitation-only {
-             background-color: rgba(161, 98, 7, 0.25) !important; /* amber-700/25% */
+        .dark tr.invitation-only {
+             background-color: rgba(161, 98, 7, 0.25) !important; /* Tailwind amber-700/25% */
         }
-        .dark .invitation-only:hover {
-            background-color: rgba(161, 98, 7, 0.35) !important; /* amber-700/35% */
+        .dark tr.invitation-only:hover {
+            background-color: rgba(161, 98, 7, 0.35) !important; /* Tailwind amber-700/35% */
         }
 
         /* Transition for stats section */
         #statsSectionContainer {
-            transition: max-height 0.7s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out;
+            transition: max-height 0.7s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out, margin-bottom 0.5s ease-in-out;
             overflow: hidden;
         }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
-    <div class="main-content container mx-auto p-4 md:p-8">
+    <div class="container mx-auto p-4 md:p-8">
         <header class="mb-4 text-center"> 
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-500">Folkemødet 2025 - Combined Event Schedule</h1>
             <p id="dataFreshness" class="text-gray-500 dark:text-gray-400 text-sm mt-2">Loading data update time...</p>
@@ -65,7 +66,7 @@
 
         <div class="flex justify-end items-center gap-4 mb-4">
             <button id="toggleStatsButton" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1V2z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="w-4 h-4"><path d="M11 2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v12h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H1v-3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3h1V7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7h1V2z"/></svg>
                 <span id="toggleStatsButtonText">Show Statistics</span>
             </button>
             <button id="theme-toggle" class="flex items-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
@@ -91,20 +92,20 @@
                 <div>
                     <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Source:</h3>
                     <div class="source-filter-buttons flex flex-wrap gap-2">
-                        <button data-source="All" class="active-filter">All Sources</button>
-                        <button data-source="Official">Official Program</button>
-                        <button data-source="Private">Private List</button>
-                        <button data-source="Social">Social Events</button>
+                        <button data-source="All" class="active-filter px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white">All Sources</button>
+                        <button data-source="Official" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Official Program</button>
+                        <button data-source="Private" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Private List</button>
+                        <button data-source="Social" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Social Events</button>
                     </div>
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Day:</h3>
                     <div class="filter-buttons flex flex-wrap gap-2">
-                        <button data-day="All" class="active-filter">All Days</button>
-                        <button data-day="Onsdag">Onsdag</button>
-                        <button data-day="Torsdag">Torsdag</button>
-                        <button data-day="Fredag">Fredag</button>
-                        <button data-day="Lørdag">Lørdag</button>
+                        <button data-day="All" class="active-filter px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white">All Days</button>
+                        <button data-day="Onsdag" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Onsdag</button>
+                        <button data-day="Torsdag" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Torsdag</button>
+                        <button data-day="Fredag" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Fredag</button>
+                        <button data-day="Lørdag" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600">Lørdag</button>
                     </div>
                 </div>
             </div>
@@ -122,15 +123,16 @@
         </footer>
     </div>
 
+    <!-- Modal Structure -->
     <div id="descriptionModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
-        <div class="modal-content bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl m-4">
-            <div class="modal-header flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl m-4">
+            <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 id="modalTitle" class="text-xl font-semibold text-gray-900 dark:text-white">Event Description</h3>
                 <button id="closeModalButton" class="text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                 </button>
             </div>
-            <div class="modal-body py-4"><p id="modalFullDescription" class="text-base leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap"></p></div>
+            <div class="py-4"><p id="modalFullDescription" class="text-base leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap"></p></div>
         </div>
     </div>
 
@@ -142,9 +144,7 @@
         const officialDataMap = {"title":"EventTitle", "day_date":"_FullDate", "startTime":"_StartTime", "endTime":"_EndTime", "location":"Location", "summary":"Description", "eventYear":"_OfficialYear", "eventCrmId":"_OfficialCrmId", "eventSlug":"_OfficialSlug", "organizers":"Organizers", "theme":"Theme"};
         const socialDataMap = {"title":"EventTitle", "summary":"Description", "url":"EventURL", "location":"Location", "day":"Weekday", "startTime":"_StartTime", "endTime":"_EndTime", "organizers":"Organizers", "theme":"Theme"};
 
-
         $(document).ready(function() {
-            // ... (All previous JS variables and functions remain here)
             const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             const socialCsvPath = 'data/social_events.csv';
@@ -164,6 +164,7 @@
             const closeModalButton = document.getElementById('closeModalButton');
             let eventsPerHourChartInstance = null;
             let eventsPerThemeChartInstance = null;
+            
             // --- THEME SWITCHER LOGIC ---
             const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
             const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
@@ -179,7 +180,6 @@
                 Chart.defaults.color = chartTextColor;
                 Chart.defaults.borderColor = chartGridColor;
 
-                // Redraw table and charts to apply new theme colors
                 if (eventDataTable) eventDataTable.draw(false);
                 if (eventsPerHourChartInstance) eventsPerHourChartInstance.update();
                 if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.update();
@@ -256,7 +256,6 @@
             }
 
             function normalizeData(rawData, sourceName, map) {
-                // ... same normalization logic ...
                 return rawData.map((rawEvent) => { 
                     const normalizedEvent = { DataSource: sourceName }; 
                     UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
@@ -316,7 +315,7 @@
                     },
                     columnDefs: [ 
                         { width: '8%', targets: colIdx.Weekday }, { width: '8%', targets: colIdx.TimeRange },
-                        { width: '15%', targets: colIdx.Location, render: (d,t) => (t==='display'&&d)?`<a href="https://programoversigt.folkemoedet.dk/?location=${encodeURIComponent(d)}" target="_blank" class="clickable-link text-blue-600 dark:text-blue-400 hover:underline">${d}</a>`:d },
+                        { width: '15%', targets: colIdx.Location, render: (d,t) => (t==='display'&&d)?`<a href="https://programoversigt.folkemoedet.dk/?location=${encodeURIComponent(d)}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">${d}</a>`:d },
                         { width: '25%', targets: colIdx.Description, render: (d,t) => { if(t==='display'&&d){const m=45; if(d.length>m) return `<span class="truncate-text text-blue-600 dark:text-blue-400" style="max-width:200px;" title="Click to read more" data-fulltext="${d.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${d.substring(0,m)}...</span>`;} return d||'';}},
                         { width: '10%', targets: colIdx.EventURL, render: (d,t) => (t==='display'&&d&&(d.startsWith('http')))?`<a href="${d}" target="_blank" class="clickable-link text-blue-600 dark:text-blue-400 hover:underline">View Event</a>`:d||'' },
                         { width: '10%', targets: colIdx.DataSource, className: "text-center" },
@@ -333,8 +332,8 @@
                 eventDataTable.column(dsIdx).search(currentSourceFilter==="All"?'':'^'+currentSourceFilter+'$',true,false,true).draw(false);
                 eventDataTable.column(wdIdx).search(currentDayFilter==="All"?'':'^'+currentDayFilter+'$',true,false,true).draw();
             }
-            $('.source-filter-buttons button').on('click', function(){ currentSourceFilter=$(this).data('source'); $('.source-filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
-            $('.filter-buttons button').on('click', function(){ currentDayFilter=$(this).data('day'); $('.filter-buttons button').removeClass('active-filter'); $(this).addClass('active-filter'); applyFilters(); });
+            $('.source-filter-buttons button').on('click', function(){ currentSourceFilter=$(this).data('source'); $('.source-filter-buttons button').removeClass('active-filter bg-blue-600 text-white').addClass('bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'); $(this).addClass('active-filter bg-blue-600 text-white').removeClass('bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'); applyFilters(); });
+            $('.filter-buttons button').on('click', function(){ currentDayFilter=$(this).data('day'); $('.filter-buttons button').removeClass('active-filter bg-blue-600 text-white').addClass('bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'); $(this).addClass('active-filter bg-blue-600 text-white').removeClass('bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'); applyFilters(); });
             $('#eventTable tbody').on('click', 'span.truncate-text', function(){ const d=$(this).data('fulltext'), r=eventDataTable.row($(this).closest('tr')).data(); modalTitle.textContent=r[UNIFIED_HEADERS.indexOf("EventTitle")]||"Details"; modalFullDescription.textContent=d; modal.style.display="flex";});
             closeModalButton.onclick=()=>modal.style.display="none"; window.onclick=(e)=>{if(e.target==modal)modal.style.display="none";}
 
@@ -360,14 +359,12 @@
                 eventsPerThemeChartInstance.data.labels=sThemes.map(e=>e[0]); eventsPerThemeChartInstance.data.datasets[0].data=sThemes.map(e=>e[1]); eventsPerThemeChartInstance.update();
             }
 
-            // Toggle Stats Section Logic
             toggleStatsButton.addEventListener('click', () => {
                 const statsSection = document.getElementById('statsSectionContainer');
                 const isHidden = statsSection.classList.contains('hidden');
                 
                 if (isHidden) {
                     statsSection.classList.remove('hidden');
-                    // We need to wait for the 'hidden' class to be removed before setting max-height
                     requestAnimationFrame(() => {
                         statsSection.classList.remove('max-h-0', 'opacity-0');
                     });
@@ -385,7 +382,7 @@
                         if (eventsPerHourChartInstance) eventsPerHourChartInstance.resize();
                         if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.resize();
                         updateVisualizations(); 
-                    }, 500); // Wait for transition to finish
+                    }, 500); 
                 }
             });
 
