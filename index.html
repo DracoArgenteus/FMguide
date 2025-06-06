@@ -37,16 +37,16 @@
         }
         
         /* Invitation-only row highlighting */
-        tr.invitation-only {
+        .invitation-only {
             background-color: rgba(254, 249, 195, 0.7) !important; /* Tailwind yellow-100/70% */
         }
-        tr.invitation-only:hover {
+        .invitation-only:hover {
             background-color: rgba(254, 240, 138, 0.7) !important; /* Tailwind yellow-200/70% */
         }
-        .dark tr.invitation-only {
+        .dark .invitation-only {
              background-color: rgba(161, 98, 7, 0.25) !important; /* Tailwind amber-700/25% */
         }
-        .dark tr.invitation-only:hover {
+        .dark .invitation-only:hover {
             background-color: rgba(161, 98, 7, 0.35) !important; /* Tailwind amber-700/35% */
         }
 
@@ -89,8 +89,8 @@
                         <p id="stat-busiest-hour" class="text-3xl font-bold text-gray-900 dark:text-white">--:--</p>
                     </div>
                     <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Top Organizer</h4>
-                        <p id="stat-top-organizer" class="text-xl font-semibold text-gray-900 dark:text-white truncate" title="N/A">N/A</p>
+                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Busiest Location</h4>
+                        <p id="stat-busiest-location" class="text-xl font-semibold text-gray-900 dark:text-white truncate" title="N/A">N/A</p>
                     </div>
                      <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
                         <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Invitation Only</h4>
@@ -184,7 +184,6 @@
             const modalFullDescription = document.getElementById('modalFullDescription');
             const closeModalButton = document.getElementById('closeModalButton');
             let eventsPerHourChartInstance = null;
-            let eventsPerThemeChartInstance = null;
             
             // --- THEME SWITCHER LOGIC ---
             const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
@@ -203,7 +202,6 @@
 
                 if (eventDataTable) eventDataTable.draw(false);
                 if (eventsPerHourChartInstance) eventsPerHourChartInstance.update();
-                if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.update();
             }
 
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -220,6 +218,7 @@
             // --- END THEME LOGIC ---
 
             function robustParseCSV(csvText) {
+                // ... same robust parser ...
                 const data = []; let headers = [];
                 const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
                 const lines = []; let inQuotes = false; let currentLine = "";
@@ -280,6 +279,12 @@
                     const normalizedEvent = { DataSource: sourceName }; 
                     UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
                     for (const rh in map) if (rawEvent.hasOwnProperty(rh)) normalizedEvent[map[rh]] = rawEvent[rh];
+                    
+                    // Specific normalization for 'Private' source
+                    if (sourceName === "Private" && normalizedEvent.TimeRange) {
+                        normalizedEvent.TimeRange = normalizedEvent.TimeRange.replace(/\./g, ':');
+                    }
+
                     if (sourceName === "Official" || sourceName === "Social") {
                         if (sourceName === "Official") {
                             normalizedEvent.Weekday = dayDateToWeekday(normalizedEvent._FullDate);
@@ -370,20 +375,20 @@
                 // Update Stat Cards
                 document.getElementById('stat-total-events').textContent = fData.length;
                 let invOnlyCount = 0;
-                const orgCounts = {};
+                const locCounts = {};
                 const hrCnt={}; for(let i=6;i<24;i++)hrCnt[i.toString().padStart(2,'0')]=0; 
                 
                 fData.forEach(r=>{
                     const tr=r[trIdx];if(tr){const sm=tr.match(/^(\d{2}):\d{2}/);if(sm)if(hrCnt.hasOwnProperty(sm[1]))hrCnt[sm[1]]++;}
-                    const org = r[UNIFIED_HEADERS.indexOf("Organizers")] || 'N/A'; if(org!=="N/A"&&org.trim()!=="")orgCounts[org]=(orgCounts[org]||0)+1;
+                    const loc = r[UNIFIED_HEADERS.indexOf("Location")] || 'N/A'; if(loc!=="N/A"&&loc.trim()!=="")locCounts[loc]=(locCounts[loc]||0)+1;
                     if((r[UNIFIED_HEADERS.indexOf("EventTitle")]||'').includes('!!Kun med invitation!!')||(r[UNIFIED_HEADERS.indexOf("Description")]||'').includes('!!Kun med invitation!!'))invOnlyCount++;
                 });
 
                 document.getElementById('stat-invitation-only').textContent = invOnlyCount;
                 const busiestHour = Object.entries(hrCnt).reduce((max,e)=>e[1]>max[1]?e:max,[null,-1]);
                 document.getElementById('stat-busiest-hour').textContent = busiestHour[1]>0?`${busiestHour[0]}:00`:"--:--";
-                const topOrg = Object.entries(orgCounts).reduce((max,e)=>e[1]>max[1]?e:max,[null,-1]);
-                const topOrgEl=document.getElementById('stat-top-organizer'); topOrgEl.textContent=topOrg[0]||"N/A"; topOrgEl.title=topOrg[0]||"N/A";
+                const busiestLoc = Object.entries(locCounts).reduce((max,e)=>e[1]>max[1]?e:max,[null,-1]);
+                const busiestLocEl=document.getElementById('stat-busiest-location'); busiestLocEl.textContent=busiestLoc[0]||"N/A"; busiestLocEl.title=busiestLoc[0]||"N/A";
                 
                 // Update Hour Chart
                 eventsPerHourChartInstance.data.labels=Object.keys(hrCnt).sort(); 
@@ -408,7 +413,7 @@
                     }, { once: true });
                 }
 
-                toggleStatsButtonText.textContent = isHidden ? "Hide Statistics" : "Show Statistics";
+                toggleStatsButtonText.textContent = isHidden ? "Show Statistics" : "Hide Statistics";
 
                 if (isHidden) { 
                     setTimeout(() => { 
