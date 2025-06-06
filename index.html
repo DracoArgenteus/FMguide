@@ -11,9 +11,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         /* Base styles for DataTables to integrate with Tailwind theming */
-        /* Light Mode styles are default Tailwind classes in the HTML */
-        /* Dark Mode styles are applied via `dark:` prefixes in the HTML */
-        
         table.dataTable {
             border-collapse: collapse !important;
             border-color: #e5e7eb; /* Tailwind gray-200 */
@@ -39,7 +36,6 @@
             border: 1px solid transparent;
         }
         
-        /* Invitation-only row highlighting - uses Tailwind classes directly in `createdRow` */
         .invitation-only {
             background-color: rgba(254, 249, 195, 0.7) !important; /* Tailwind yellow-100/70% */
         }
@@ -353,9 +349,14 @@
 
             // Toggle Stats Section Logic
             toggleStatsButton.addEventListener('click', () => {
-                const isHidden = statsSectionContainer.classList.toggle('hidden');
-                toggleStatsButtonText.textContent = isHidden ? "Show Statistics" : "Hide Statistics";
-                if (!isHidden) { 
+                const statsSection = document.getElementById('statsSectionContainer');
+                statsSection.classList.toggle('hidden');
+                statsSection.classList.toggle('max-h-0');
+                statsSection.classList.toggle('opacity-0');
+                const buttonText = document.getElementById('toggleStatsButtonText');
+                buttonText.textContent = statsSection.classList.contains('hidden') ? "Show Statistics" : "Hide Statistics";
+
+                if (!statsSection.classList.contains('hidden')) { 
                     setTimeout(() => { 
                         if (eventsPerHourChartInstance) eventsPerHourChartInstance.resize();
                         if (eventsPerThemeChartInstance) eventsPerThemeChartInstance.resize();
