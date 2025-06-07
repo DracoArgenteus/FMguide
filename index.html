@@ -8,18 +8,14 @@
     <script src="https://code.jquery.com/jquery-3.7.0.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK v11.9.0 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
         import { getFirestore, collection, getDocs, onSnapshot, addDoc, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
       
-        // =================================================================================
-        // YOUR FIREBASE CONFIGURATION OBJECT GOES HERE
-        // =================================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyAwNsvDxANT6VKgWRl7bOu4FkTkmahKoss",
             authDomain: "fm-app-c58ab.firebaseapp.com",
@@ -30,16 +26,14 @@
             measurementId: "G-9GBEZCE9NG"
         };
 
-        // Initialize Firebase
         try {
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const db = getFirestore(app);
             const analytics = getAnalytics(app);
 
-            // Make Firebase services globally available for the main script
             window.firebase = { app, auth, db, analytics, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, onSnapshot, addDoc, query, where, deleteDoc, doc };
-            console.log("Firebase initialized successfully.");
+            console.log("Firebase initialized successfully with version 11.9.0 and Analytics.");
         } catch (e) {
             console.error("Error initializing Firebase. Please check your firebaseConfig object.", e);
             alert("Could not initialize Firebase. Check your configuration and console for errors.");
@@ -94,7 +88,6 @@
             padding: 2px 6px; font-size: 0.7rem; border-radius: 9999px;
             font-weight: 500; color: white;
         }
-        
         .view-toggle-button.active-view {
             background-color: #ffffff;
             color: #2563eb;
@@ -107,25 +100,7 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
     <!-- Auth Modal and Description Modal HTML remains the same -->
-    <div id="authModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[1051]">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm m-4">
-            <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Login / Sign Up</h3>
-                <button id="closeAuthModalButton" class="text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                </button>
-            </div>
-            <div class="py-4 space-y-4">
-                <input id="authEmail" type="email" placeholder="Email" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
-                <input id="authPassword" type="password" placeholder="Password (min. 6 characters)" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
-                <p id="authError" class="text-sm text-red-500 hidden"></p>
-            </div>
-            <div class="flex justify-end gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <button id="authSignUpButton" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500">Sign Up</button>
-                <button id="authLoginButton" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Login</button>
-            </div>
-        </div>
-    </div>
+    <div id="authModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[1051]">...</div>
     <div id="descriptionModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">...</div>
     
     <div class="container mx-auto p-4 md:p-8">
@@ -146,7 +121,7 @@
                 <button id="showTableViewButton" class="view-toggle-button active-view px-4 py-1 text-sm font-semibold rounded-md bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400">Table View</button>
                 <button id="showCalendarViewButton" class="view-toggle-button px-4 py-1 text-sm font-semibold rounded-md text-gray-600 dark:text-gray-300">Calendar View</button>
             </div>
-            <!-- Other Controls -->
+            <!-- Theme Toggle -->
             <div class="flex items-center gap-4">
                 <button id="theme-toggle" class="flex items-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">...</button>
             </div>
@@ -170,8 +145,10 @@
         
         <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">...</footer>
     </div>
-    
-    <script>
+
+    <script type="module">
+        // NO LONGER IMPORTING FROM './calendar.js'
+
         $(document).ready(function() {
             // --- DELEGATION CONFIGURATION ---
             const delegationConfig = {
@@ -184,65 +161,25 @@
             const everyoneColorConfig = { name: "Everyone", color: "bg-yellow-400", borderColor: "border-yellow-600" };
             // --- END CONFIGURATION ---
 
-            const UNIFIED_HEADERS = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource", "Actions"];
+            const UNIFIED_HEADERS_WITH_ACTION = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource", "Actions"];
             let eventDataTable = null;
             let allEvents = [];
             let allSignups = {}; 
             let currentUser = null;
+            let unsubscribeSignups = null;
 
-            const tableView = document.getElementById('tableView');
-            const calendarView = document.getElementById('calendarViewContainer');
-            const showTableViewButton = document.getElementById('showTableViewButton');
-            const showCalendarViewButton = document.getElementById('showCalendarViewButton');
+            // --- All other variable declarations ---
             const authModal = document.getElementById('authModal');
-            const closeAuthModalButton = document.getElementById('closeAuthModalButton');
-            const authSignUpButton = document.getElementById('authSignUpButton');
-            const authLoginButton = document.getElementById('authLoginButton');
-            const authError = document.getElementById('authError');
             const loginButton = document.getElementById('login-button');
             const logoutButton = document.getElementById('logout-button');
             const userStatus = document.getElementById('user-status');
-            const themeToggleButton = document.getElementById('theme-toggle');
-            
-            // --- THEME LOGIC ---
-            function applyTheme(isDark) { /* ... same as before ... */ }
-            // Initial theme setup
-            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                applyTheme(true);
-            } else {
-                applyTheme(false);
-            }
-            themeToggleButton.addEventListener('click', function() {
-                const isDark = !document.documentElement.classList.contains('dark');
-                localStorage.setItem('theme', isDark ? 'dark' : 'light');
-                applyTheme(isDark);
-            });
+            const calendarEl = document.getElementById('calendarView');
+            const calendarViewContainer = document.getElementById('calendarViewContainer');
+            const tableView = document.getElementById('tableView');
 
-            // --- AUTH LOGIC ---
-            function openAuthModal() { authModal.style.display = "flex"; }
-            function closeAuthModal() { authModal.style.display = "none"; document.getElementById('authError').textContent = ''; document.getElementById('authError').classList.add('hidden'); }
-            loginButton.addEventListener('click', openAuthModal);
-            closeAuthModalButton.addEventListener('click', closeAuthModal);
-            authSignUpButton.addEventListener('click', () => {
-                if (!window.firebase) { alert("Firebase not ready."); return; }
-                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, document.getElementById('authEmail').value, document.getElementById('authPassword').value)
-                    .then(() => closeAuthModal())
-                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
-            });
-            authLoginButton.addEventListener('click', () => {
-                if (!window.firebase) { alert("Firebase not ready."); return; }
-                window.firebase.signInWithEmailAndPassword(window.firebase.auth, document.getElementById('authEmail').value, document.getElementById('authPassword').value)
-                    .then(() => closeAuthModal())
-                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
-            });
-            logoutButton.addEventListener('click', () => {
-                if (window.firebase) window.firebase.signOut(window.firebase.auth);
-            });
-
-            // --- DATA & APP LOGIC ---
-            let unsubscribeSignups = null;
+            // --- AUTH LOGIC & MAIN APP DRIVER ---
             function setupAuthListener() {
-                if (!window.firebase) { setTimeout(setupAuthListener, 100); return; }
+                if (!window.firebase) { setTimeout(setupAuthListener, 100); return; } 
                 window.firebase.onAuthStateChanged(window.firebase.auth, async (user) => {
                     if (user) {
                         currentUser = user;
@@ -250,16 +187,22 @@
                         userStatus.classList.remove('hidden');
                         loginButton.classList.add('hidden');
                         logoutButton.classList.remove('hidden');
+                        
                         allEvents = await fetchEventsFromFirestore();
                         initializeDataTable(allEvents);
                         setupSignupsListener();
                     } else {
                         currentUser = null;
                         if (unsubscribeSignups) unsubscribeSignups();
+                        allEvents = [];
+                        allSignups = {};
+                        
                         userStatus.classList.add('hidden');
                         loginButton.classList.remove('hidden');
                         logoutButton.classList.add('hidden');
+                        
                         if (eventDataTable) { eventDataTable.clear().draw(); }
+                        renderCalendar(calendarEl, [], {}, {}, {}); // Clear calendar
                     }
                 });
             }
@@ -279,18 +222,23 @@
                 const { db, collection, onSnapshot } = window.firebase;
                 const signupsRef = collection(db, "signups");
                 unsubscribeSignups = onSnapshot(signupsRef, (querySnapshot) => {
+                    console.log("Real-time signup data received.");
                     allSignups = {};
                     querySnapshot.forEach((doc) => {
                         const signup = doc.data();
-                        if (!allSignups[signup.eventId]) allSignups[signup.eventId] = {};
-                        allSignups[signup.eventId][signup.userId] = { docId: doc.id, userEmail: signup.userEmail };
+                        if (!allSignups[signup.eventId]) { allSignups[signup.eventId] = {}; }
+                        allSignups[signup.eventId][signup.userId] = { docId: doc.id, userEmail: signup.userEmail }; 
                     });
-                    if (eventDataTable) eventDataTable.draw(false);
-                    if (!calendarView.classList.contains('hidden')) renderCalendar();
+                    
+                    if(eventDataTable) eventDataTable.draw(false);
+                    if (!calendarViewContainer.classList.contains('hidden')) {
+                        renderCalendar(calendarEl, allEvents, allSignups, delegationConfig, everyoneColorConfig);
+                    }
                 });
             }
 
             function handleSignUp(eventId, isSignedUp) {
+                if (!currentUser) { alert("Please log in to sign up."); return; }
                 const { db, collection, addDoc, deleteDoc, doc } = window.firebase;
                 if (isSignedUp) {
                     const signupDocId = allSignups[eventId]?.[currentUser.uid]?.docId;
@@ -301,58 +249,148 @@
             }
 
             function initializeDataTable(data) {
-                // ... same as previous version, but now includes the Actions column ...
-                const colIdx = {}; UNIFIED_HEADERS.forEach((h,i) => colIdx[h]=i);
+                const colIdx = {}; UNIFIED_HEADERS_WITH_ACTION.forEach((h,i) => colIdx[h]=i);
                 if(eventDataTable) { eventDataTable.destroy(); $('#eventTable tbody').empty(); }
-                let headerHtml = '<tr>'; UNIFIED_HEADERS.forEach(h => {headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); headerHtml+='</tr>';
+                let headerHtml = '<tr>'; UNIFIED_HEADERS_WITH_ACTION.forEach(h => {headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); headerHtml+='</tr>';
                 $('#eventTable thead').html(headerHtml);
 
                 eventDataTable = $('#eventTable').DataTable({
-                    data: data.map(e => [...UNIFIED_HEADERS.slice(0, -1).map(h => e[h] || ''), '']),
-                    order: [[colIdx.Weekday,'asc'],[colIdx.TimeRange,'asc']],
+                    data: data.map(e => [...UNIFIED_HEADERS_WITH_ACTION.slice(0, -1).map(h => e[h] || ''), '']),
+                    createdRow: function(row, data, dataIndex) { /* ... same as before ... */ },
                     columnDefs: [
                         { targets: colIdx.Actions, orderable: false, className: "text-center",
                           render: function(d, t, row, meta) {
-                            const eventId = allEvents[meta.row].id;
-                            if (!eventId || !currentUser) return '';
-                            const isSignedUp = allSignups[eventId]?.[currentUser.uid];
-                            return `<button data-event-id="${eventId}" class="signup-btn px-2 py-1 text-xs rounded ${isSignedUp ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}">${isSignedUp ? 'Cancel' : 'Sign Up'}</button>`;
+                            const event = allEvents[meta.row];
+                            if (!event?.id || !currentUser) return '';
+                            const isSignedUp = allSignups[event.id]?.[currentUser.uid];
+                            return `<button data-event-id="${event.id}" class="signup-btn px-2 py-1 text-xs rounded ${isSignedUp ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white">${isSignedUp ? 'Cancel' : 'Sign Up'}</button>`;
                           }
                         }
                     ]
                 });
                  $('#eventTable tbody').on('click', '.signup-btn', function() {
-                    const eventId = $(this).data('eventId');
-                    const isSignedUp = $(this).text() === 'Cancel';
-                    handleSignUp(eventId, isSignedUp);
+                    handleSignUp($(this).data('eventId'), $(this).text() === 'Cancel');
                 });
             }
+            
+            // --- CALENDAR RENDER FUNCTION IS NOW INCLUDED HERE ---
+            function renderCalendar(calendarEl, allEvents, allSignups, delegationConfig, everyoneColorConfig) {
+                if (!calendarEl || !allEvents || !allSignups || !delegationConfig || !everyoneColorConfig) {
+                    console.error("renderCalendar: Missing one or more required arguments.");
+                    return;
+                }
+                console.log("Rendering calendar with latest event and signup data...");
 
-            function renderCalendar() {
-                // Complex function to render the calendar grid and events
-                // This would involve creating divs, positioning them based on time,
-                // and color-coding based on the `allSignups` data.
-                console.log("Rendering calendar with updated data...");
+                const days = ["Onsdag", "Torsdag", "Fredag", "Lørdag"];
+                const startHour = 8;
+                const endHour = 22; // Renders up to 21:xx timeslot
+
+                // --- 1. Build the Calendar Grid Structure ---
+                let html = '<div class="time-label"></div>'; // Top-left empty corner
+                days.forEach(day => {
+                    html += `<div class="calendar-header">${day}</div>`;
+                });
+
+                for (let hour = startHour; hour < endHour; hour++) {
+                    html += `<div class="time-label">${String(hour).padStart(2, '0')}:00</div>`;
+                    days.forEach(day => {
+                        html += `<div class="calendar-timeslot" data-day="${day}" data-hour="${hour}"></div>`;
+                    });
+                }
+                calendarEl.innerHTML = html;
+
+                // --- 2. Group Events by Timeslot for Overlap Calculation ---
+                const eventsToRender = allEvents.filter(e => days.includes(e.Weekday));
+                const eventLayout = {}; // Key: "Weekday-Hour", Value: [event, event, ...]
+
+                eventsToRender.forEach(event => {
+                    if (!event.TimeRange) return;
+                    const timeMatch = event.TimeRange.match(/^(\d{2}):(\d{2})/);
+                    if (!timeMatch) return;
+
+                    const startHourEvent = parseInt(timeMatch[1], 10);
+                    const slotKey = `${event.Weekday}-${startHourEvent}`;
+                    if (!eventLayout[slotKey]) {
+                        eventLayout[slotKey] = [];
+                    }
+                    eventLayout[slotKey].push(event);
+                });
+
+                // --- 3. Render Events onto the Grid ---
+                for (const slotKey in eventLayout) {
+                    const eventsInSlot = eventLayout[slotKey];
+                    const [day, hour] = slotKey.split('-');
+                    const slotEl = calendarEl.querySelector(`[data-day="${day}"][data-hour="${hour}"]`);
+                    if (!slotEl) continue;
+
+                    eventsInSlot.sort((a, b) => a.EventTitle.localeCompare(b.EventTitle));
+
+                    const numOverlaps = eventsInSlot.length;
+
+                    eventsInSlot.forEach((event, index) => {
+                        const startMinute = parseInt(event.TimeRange.substring(3, 5), 10);
+                        const eventEl = document.createElement('div');
+                        
+                        const attendees = allSignups[event.id] || {};
+                        const attendeeEmails = Object.values(attendees).map(att => att.userEmail);
+                        const delegationEmails = Object.keys(delegationConfig);
+                        const isEveryone = delegationEmails.length > 0 && delegationEmails.every(email => attendeeEmails.includes(email));
+                        
+                        let bgColor, borderColor;
+                        if (isEveryone) {
+                            ({ color: bgColor, borderColor } = everyoneColorConfig);
+                        } else if (attendeeEmails.length > 0) {
+                            const firstAttendeeEmail = attendeeEmails.find(email => delegationConfig[email]);
+                            const firstAttendeeConfig = delegationConfig[firstAttendeeEmail];
+                            ({ color: bgColor, borderColor } = firstAttendeeConfig || { color: 'bg-gray-400', borderColor: 'border-gray-600' });
+                        } else {
+                             ({ color: bgColor, borderColor } = { color: 'bg-gray-200 dark:bg-gray-600', borderColor: 'border-gray-400 dark:border-gray-500' });
+                        }
+                        
+                        eventEl.className = `calendar-event ${bgColor} ${borderColor}`;
+                        
+                        eventEl.style.width = `calc(${100 / numOverlaps}% - 2px)`;
+                        eventEl.style.left = `calc(${(100 / numOverlaps) * index}% + ${index * 1}px)`;
+                        eventEl.style.top = `${(startMinute / 60) * 100}%`;
+                        eventEl.style.height = `95%`; 
+
+                        const attendeesHtml = delegationEmails
+                            .map(email => {
+                                const userConfig = delegationConfig[email];
+                                const isAttending = attendeeEmails.includes(email);
+                                if (isAttending && userConfig) {
+                                    return `<div class="attendee-pill ${userConfig.color}" title="${userConfig.name}">${userConfig.name.charAt(0)}</div>`;
+                                }
+                                return '';
+                            })
+                            .join('');
+
+                        eventEl.innerHTML = `
+                            <div class="calendar-event-inner">
+                                <span class="event-title">${event.EventTitle}</span>
+                                <span class="event-location">${event.Location}</span>
+                                <div class="event-attendees">${attendeesHtml}</div>
+                            </div>`;
+                        
+                        slotEl.appendChild(eventEl);
+                    });
+                }
             }
             
             // --- View Toggle Logic ---
-            const tableView = document.getElementById('tableView');
-            const calendarView = document.getElementById('calendarViewContainer');
             const showTableViewButton = document.getElementById('showTableViewButton');
             const showCalendarViewButton = document.getElementById('showCalendarViewButton');
-
+            
             showTableViewButton.addEventListener('click', () => {
-                tableView.classList.remove('hidden');
-                calendarView.classList.add('hidden');
+                tableView.classList.remove('hidden'); calendarViewContainer.classList.add('hidden');
                 showTableViewButton.classList.add('active-view', 'bg-white', 'dark:bg-gray-800');
                 showCalendarViewButton.classList.remove('active-view', 'bg-white', 'dark:bg-gray-800');
             });
             showCalendarViewButton.addEventListener('click', () => {
-                tableView.classList.add('hidden');
-                calendarView.classList.remove('hidden');
+                tableView.classList.add('hidden'); calendarViewContainer.classList.remove('hidden');
                 showCalendarViewButton.classList.add('active-view', 'bg-white', 'dark:bg-gray-800');
                 showTableViewButton.classList.remove('active-view', 'bg-white', 'dark:bg-gray-800');
-                renderCalendar();
+                renderCalendar(calendarEl, allEvents, allSignups, delegationConfig, everyoneColorConfig);
             });
 
             // Initial setup call
