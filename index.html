@@ -36,9 +36,7 @@
             const auth = getAuth(app);
             const db = getFirestore(app);
             const analytics = getAnalytics(app);
-
-            // Make Firebase services globally available for the main script
-            window.firebase = { app, auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged };
+            window.firebase = { app, auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, analytics };
             console.log("Firebase initialized successfully.");
         } catch (e) {
             console.error("Error initializing Firebase. Please check your firebaseConfig object.", e);
@@ -95,6 +93,7 @@
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <!-- Auth Modal -->
     <div id="authModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[1051]">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm m-4">
             <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
@@ -115,13 +114,14 @@
         </div>
     </div>
     
+    <!-- Main Content Container -->
     <div class="container mx-auto p-4 md:p-8">
         <header class="mb-4 text-center relative"> 
             <div class="absolute top-0 left-0">
                 <span id="user-status" class="text-sm text-gray-600 dark:text-gray-400 hidden"></span>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-500">Folkemødet 2025 - Combined Event Schedule</h1>
-            <p id="dataFreshness" class="text-gray-500 dark:text-gray-400 text-sm mt-2">Loading data update time...</p>
+            <p id="dataFreshness" class="text-gray-500 dark:text-gray-400 text-sm mt-2">Loading data from Firestore...</p>
             <div id="auth-controls" class="absolute top-0 right-0 flex items-center gap-3">
                 <button id="login-button" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Login</button>
                 <button id="logout-button" class="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 hidden">Logout</button>
@@ -200,48 +200,46 @@
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
         const UNIFIED_HEADERS = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource"];
-        const privateDataMap = {"EventTitle":"EventTitle", "Weekday":"Weekday", "TimeRange":"TimeRange", "Location":"Location", "Description":"Description", "EventURL":"EventURL", "Organizers":"Organizers", "Theme":"Theme", "DataSource":"DataSource", "OriginalSourceDoc":"OriginalSourceDoc"};
-        const officialDataMap = {"title":"EventTitle", "day_date":"_FullDate", "startTime":"_StartTime", "endTime":"_EndTime", "location":"Location", "summary":"Description", "eventYear":"_OfficialYear", "eventCrmId":"_OfficialCrmId", "eventSlug":"_OfficialSlug", "organizers":"Organizers", "theme":"Theme"};
-        const socialDataMap = {"title":"EventTitle", "summary":"Description", "url":"EventURL", "location":"Location", "day":"Weekday", "startTime":"_StartTime", "endTime":"_EndTime", "organizers":"Organizers", "theme":"Theme"};
 
         $(document).ready(function() {
-            // All script logic, including data loading, normalization,
-            // DataTable initialization, and all event listeners, goes here.
-            
-            const privateCsvPath = 'data/folkemoedet_private_events.csv';
-            const officialCsvPath = 'data/official_events_combined.csv';
-            const socialCsvPath = 'data/social_events.csv';
-            
+            let eventDataTable = null;
+            let allEvents = []; // This will hold the data from Firestore
+
+            // --- ALL DOM ELEMENT GETTERS ---
             const tableErrorMessageDiv = document.getElementById('tableErrorMessage');
             const dataFreshnessElement = document.getElementById('dataFreshness');
             const statsSectionContainer = document.getElementById('statsSectionContainer');
             const toggleStatsButton = document.getElementById('toggleStatsButton');
             const toggleStatsButtonText = document.getElementById('toggleStatsButtonText');
-            
-            let eventDataTable = null;
-            let allNormalizedEvents = []; 
-
             const modal = document.getElementById('descriptionModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalFullDescription = document.getElementById('modalFullDescription');
             const closeModalButton = document.getElementById('closeModalButton');
-            let eventsPerHourChartInstance = null;
-            
-            // --- THEME SWITCHER LOGIC ---
+            const authModal = document.getElementById('authModal');
+            const authEmailInput = document.getElementById('authEmail');
+            const authPasswordInput = document.getElementById('authPassword');
+            const authSignUpButton = document.getElementById('authSignUpButton');
+            const authLoginButton = document.getElementById('authLoginButton');
+            const authError = document.getElementById('authError');
+            const closeAuthModalButton = document.getElementById('closeAuthModalButton');
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const userStatus = document.getElementById('user-status');
             const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
             const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
             const themeToggleButton = document.getElementById('theme-toggle');
 
+            let eventsPerHourChartInstance = null;
+            
+            // --- THEME SWITCHER LOGIC ---
             function applyTheme(isDark) {
                 document.documentElement.classList.toggle('dark', isDark);
                 themeToggleLightIcon.classList.toggle('hidden', !isDark);
                 themeToggleDarkIcon.classList.toggle('hidden', isDark);
-                
                 const chartTextColor = isDark ? '#d1d5db' : '#4b5563';
                 const chartGridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
                 Chart.defaults.color = chartTextColor;
                 Chart.defaults.borderColor = chartGridColor;
-
                 if (eventDataTable) eventDataTable.draw(false);
                 if (eventsPerHourChartInstance) eventsPerHourChartInstance.update();
             }
@@ -260,190 +258,66 @@
             // --- END THEME LOGIC ---
 
             // --- FIREBASE AUTH LOGIC ---
-            const authModal = document.getElementById('authModal');
-            const authEmailInput = document.getElementById('authEmail');
-            const authPasswordInput = document.getElementById('authPassword');
-            const authSignUpButton = document.getElementById('authSignUpButton');
-            const authLoginButton = document.getElementById('authLoginButton');
-            const authError = document.getElementById('authError');
-            const closeAuthModalButton = document.getElementById('closeAuthModalButton');
-            
-            const loginButton = document.getElementById('login-button');
-            const logoutButton = document.getElementById('logout-button');
-            const userStatus = document.getElementById('user-status');
-            
             function openAuthModal() { authModal.style.display = "flex"; }
-            function closeAuthModal() { authModal.style.display = "none"; authError.classList.add('hidden'); }
-
+            function closeAuthModal() { authModal.style.display = "none"; authError.textContent = ''; authError.classList.add('hidden'); }
             loginButton.addEventListener('click', openAuthModal);
             closeAuthModalButton.addEventListener('click', closeAuthModal);
-
             authSignUpButton.addEventListener('click', () => {
                 if (!window.firebase) { alert("Firebase is not initialized."); return; }
-                const email = authEmailInput.value;
-                const password = authPasswordInput.value;
-                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password)
-                    .then((userCredential) => {
-                        console.log("User signed up successfully:", userCredential.user);
-                        closeAuthModal();
-                    })
-                    .catch((error) => {
-                        console.error("Sign up error:", error);
-                        authError.textContent = error.message;
-                        authError.classList.remove('hidden');
-                    });
+                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, authEmailInput.value, authPasswordInput.value)
+                    .then(userCredential => closeAuthModal())
+                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
             });
-
             authLoginButton.addEventListener('click', () => {
                 if (!window.firebase) { alert("Firebase is not initialized."); return; }
-                const email = authEmailInput.value;
-                const password = authPasswordInput.value;
-                window.firebase.signInWithEmailAndPassword(window.firebase.auth, email, password)
-                    .then((userCredential) => {
-                        console.log("User logged in successfully:", userCredential.user);
-                        closeAuthModal();
-                    })
-                    .catch((error) => {
-                        console.error("Login error:", error);
-                        authError.textContent = error.message;
-                        authError.classList.remove('hidden');
-                    });
+                window.firebase.signInWithEmailAndPassword(window.firebase.auth, authEmailInput.value, authPasswordInput.value)
+                    .then(userCredential => closeAuthModal())
+                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
             });
-
             logoutButton.addEventListener('click', () => {
-                if (!window.firebase) return;
-                window.firebase.signOut(window.firebase.auth).catch(error => console.error("Logout error:", error));
+                if (window.firebase) window.firebase.signOut(window.firebase.auth).catch(error => console.error("Logout error:", error));
             });
-
-            // Listen for authentication state changes
-            if (window.firebase) {
-                window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
-                    if (user) {
-                        console.log("Auth state changed: User is logged in.", user.email);
-                        userStatus.textContent = user.email;
-                        userStatus.classList.remove('hidden');
-                        loginButton.classList.add('hidden');
-                        logoutButton.classList.remove('hidden');
-                    } else {
-                        console.log("Auth state changed: User is logged out.");
-                        userStatus.textContent = '';
-                        userStatus.classList.add('hidden');
-                        loginButton.classList.remove('hidden');
-                        logoutButton.classList.add('hidden');
-                    }
-                });
-            }
             // --- END FIREBASE AUTH LOGIC ---
 
-            function robustParseCSV(csvText) {
-                const data = []; let headers = [];
-                const normalizedCsvText = csvText.trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                const lines = []; let inQuotes = false; let currentLine = "";
-                for (let i = 0; i < normalizedCsvText.length; i++) {
-                    const char = normalizedCsvText[i]; currentLine += char;
-                    if (char === '"') {
-                        if (i + 1 < normalizedCsvText.length && normalizedCsvText[i+1] === '"') { currentLine += '"'; i++; } else { inQuotes = !inQuotes; }
-                    } else if (char === '\n' && !inQuotes) { lines.push(currentLine.trim()); currentLine = ""; }
+            // --- NEW: FETCH FROM FIRESTORE ---
+            async function fetchEventsFromFirestore() {
+                if (!window.firebase) {
+                    console.error("Firebase not ready, cannot fetch data.");
+                    tableErrorMessageDiv.textContent = "Firebase connection not available. Please check configuration.";
+                    tableErrorMessageDiv.classList.remove('hidden');
+                    return;
                 }
-                if (currentLine.trim()) { lines.push(currentLine.trim()); }
-                if (lines.length === 0) return { headers, data };
-                const splitCsvFields = (line) => {
-                    const fields = []; let currentField = ""; let inFieldQuotes = false;
-                    for (let i = 0; i < line.length; i++) {
-                        const char = line[i];
-                        if (char === '"') {
-                            if (inFieldQuotes && i + 1 < line.length && line[i+1] === '"') { currentField += '"'; i++; } else { inFieldQuotes = !inFieldQuotes; }
-                        } else if (char === ',' && !inFieldQuotes) { fields.push(currentField); currentField = ""; } else { currentField += char; }
-                    }
-                    fields.push(currentField); 
-                    return fields.map(field => field.replace(/^"|"$/g, '').replace(/""/g, '"'));
-                };
-                headers = splitCsvFields(lines[0]);
-                for (let i = 1; i < lines.length; i++) {
-                    if (lines[i].trim() === "") continue;
-                    const values = splitCsvFields(lines[i]);
-                    if (values.length === headers.length) {
-                        let row = {}; headers.forEach((header, index) => { row[header.trim()] = values[index]; });
-                        data.push(row);
-                    } else { console.warn(`Skipping malformed CSV line: Line ${i+1}`, values); }
+                const { db, collection, getDocs } = window.firebase;
+                try {
+                    const querySnapshot = await getDocs(collection(db, "events")); // Assumes collection name is "events"
+                    const firestoreEvents = [];
+                    querySnapshot.forEach((doc) => {
+                        firestoreEvents.push({ id: doc.id, ...doc.data() });
+                    });
+                    console.log(`Successfully fetched ${firestoreEvents.length} events from Firestore.`);
+                    dataFreshnessElement.textContent = `Data loaded from live database.`;
+                    allEvents = firestoreEvents; // Replace CSV data with Firestore data
+                    initializeDataTable(allEvents); // Initialize the page with the new data
+                } catch (error) {
+                    console.error("Error fetching events from Firestore:", error);
+                    tableErrorMessageDiv.textContent = `Error fetching data from database: ${error.message}`;
+                    tableErrorMessageDiv.classList.remove('hidden');
                 }
-                return { headers, data };
             }
 
-            function formatTime(ptTime) { 
-                if (!ptTime) return '';
-                if (ptTime.includes(':')) return ptTime; 
-                if (!ptTime.startsWith('PT')) return '';
-                let h = '00', m = '00'; const H_match = ptTime.match(/(\d+)H/); if (H_match) h = H_match[1].padStart(2,'0');
-                const M_match = ptTime.match(/(\d+)M/); if (M_match) m = M_match[1].padStart(2,'0'); return `${h}:${m}`;
-            }
-
-            function dayDateToWeekday(dateString) { 
-                if (!dateString) return ''; try { const date = new Date(dateString + 'T00:00:00Z'); if (isNaN(date.getDay())) return 'Invalid Date'; return ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"][date.getDay()]; } catch (e) { return 'Date Error'; }
-            }
-            
-            function timeAgo(date) {
-                if (!date) return "unknown"; const s = Math.floor((new Date() - date) / 1000); let i = s / 31536000;
-                if (i > 1) return Math.floor(i) + " years ago"; i = s / 2592000;
-                if (i > 1) return Math.floor(i) + " months ago"; i = s / 86400;
-                if (i > 1) return Math.floor(i) + " days ago"; i = s / 3600;
-                if (i > 1) return Math.floor(i) + " hours ago"; i = s / 60;
-                if (i > 1) return Math.floor(i) + " minutes ago"; return Math.floor(s) + " seconds ago";
-            }
-
-            function normalizeData(rawData, sourceName, map) {
-                return rawData.map((rawEvent) => { 
-                    const normalizedEvent = { DataSource: sourceName }; 
-                    UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
-                    for (const rh in map) if (rawEvent.hasOwnProperty(rh)) normalizedEvent[map[rh]] = rawEvent[rh];
-                    
-                    if (sourceName === "Private" && normalizedEvent.TimeRange) {
-                        normalizedEvent.TimeRange = normalizedEvent.TimeRange.replace(/\./g, ':');
-                    }
-
-                    if (sourceName === "Official" || sourceName === "Social") {
-                        if (sourceName === "Official") {
-                            normalizedEvent.Weekday = dayDateToWeekday(normalizedEvent._FullDate);
-                        }
-                        const startTimeFormatted = formatTime(rawEvent.startTime);
-                        const endTimeFormatted = formatTime(rawEvent.endTime);
-                        if (startTimeFormatted && endTimeFormatted && startTimeFormatted !== endTimeFormatted) {
-                            normalizedEvent.TimeRange = `${startTimeFormatted}-${endTimeFormatted}`;
-                        } else if (startTimeFormatted) {
-                            normalizedEvent.TimeRange = startTimeFormatted;
-                        }
-                        if (sourceName === "Official" && rawEvent.eventYear && rawEvent.eventCrmId && rawEvent.eventSlug) {
-                            normalizedEvent.EventURL = `https://programoversigt.folkemoedet.dk/events/${rawEvent.eventYear}/${rawEvent.eventCrmId}/${rawEvent.eventSlug}`;
-                        }
-                        if (sourceName === "Social" && !normalizedEvent.Theme) {
-                            normalizedEvent.Theme = "Social";
-                        }
-                    }
-                    return normalizedEvent;
-                });
-            }
-            
-            let lastModifiedTimestamps = [];
-
-            Promise.all([
-                fetch(privateCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${privateCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error private events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Private",privateDataMap)).catch(e=>{console.error(`Proc fail ${privateCsvPath}:`,e); return[];}),
-                fetch(officialCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${officialCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error official events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Official",officialDataMap)).catch(e=>{console.error(`Proc fail ${officialCsvPath}:`,e); return[];}),
-                fetch(socialCsvPath).then(r => { if (!r.ok) { console.error(`Load fail: ${socialCsvPath}`); tableErrorMessageDiv.innerHTML += `<p>Error social events.</p>`; tableErrorMessageDiv.classList.remove('hidden'); return {text:()=>Promise.resolve(""),headers:{get:()=>null}}; } lastModifiedTimestamps.push(r.headers.get('Last-Modified')); return r.text(); }).then(t=>normalizeData(robustParseCSV(t).data,"Social",socialDataMap)).catch(e=>{console.error(`Proc fail ${socialCsvPath}:`,e); return[];})
-            ])
-            .then(([privateEvents, officialEvents, socialEvents]) => {
-                const validDates = lastModifiedTimestamps.filter(d => d).map(d => new Date(d));
-                dataFreshnessElement.textContent = validDates.length > 0 ? `Data last updated: ${new Date(Math.max.apply(null,validDates)).toLocaleString()} (${timeAgo(new Date(Math.max.apply(null,validDates)))})` : "Data update time: Not available";
-                allNormalizedEvents = [...privateEvents, ...officialEvents, ...socialEvents];
-                console.log(`Total normalized: ${allNormalizedEvents.length} (Private:${privateEvents.length}, Official:${officialEvents.length}, Social:${socialEvents.length})`);
-                if(allNormalizedEvents.length === 0 && !tableErrorMessageDiv.textContent.includes("Error")) tableErrorMessageDiv.textContent = "No event data loaded.";
-                tableErrorMessageDiv.classList.toggle('hidden', allNormalizedEvents.length > 0 || tableErrorMessageDiv.textContent.includes("Error"));
+            function initializeDataTable(data) {
+                // ... (The entire DataTable initialization and chart logic goes here, using 'data' as its source)
+                console.log(`Initializing table with ${data.length} events.`);
+                tableErrorMessageDiv.classList.add('hidden'); // Hide any previous errors
                 
                 let headerHtml = '<tr>'; UNIFIED_HEADERS.forEach(h => {headerHtml += `<th class="px-4 py-2 text-left text-sm font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700">${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); headerHtml+='</tr>';
                 $('#eventTable thead').html(headerHtml);
                 const colIdx = {}; UNIFIED_HEADERS.forEach((h,i) => colIdx[h]=i);
 
+                if(eventDataTable) { eventDataTable.destroy(); $('#eventTable tbody').empty(); } // Clear previous table if re-initializing
+
                 eventDataTable = $('#eventTable').DataTable({
-                    data: allNormalizedEvents.map(e => UNIFIED_HEADERS.map(h => e[h])),
+                    data: data.map(e => UNIFIED_HEADERS.map(h => e[h])),
                     responsive: true, lengthMenu: [[25,50,100,-1],[25,50,100,"All"]], pageLength: 25,
                     language: {search:"_INPUT_",searchPlaceholder:"Search...",lengthMenu:"Show _MENU_",zeroRecords:"No matching events.",emptyTable:"No events loaded."},
                     order: [[colIdx.Weekday,'asc'],[colIdx.TimeRange,'asc']],
@@ -463,9 +337,38 @@
                         { width: '14%', targets: colIdx.Organizers }, { width: '10%', targets: colIdx.Theme }
                     ]
                 });
-                initializeCharts(); eventDataTable.on('draw.dt', updateVisualizations); updateVisualizations();
-            }).catch(e => { console.error('General error:',e); tableErrorMessageDiv.textContent = `General Error: ${e.message}.`; tableErrorMessageDiv.classList.remove('hidden'); dataFreshnessElement.textContent = "Could not determine data update time."; });
+                initializeCharts(); 
+                eventDataTable.on('draw.dt', updateVisualizations); 
+                updateVisualizations();
+            }
 
+            // Authentication state change listener - this is now the main trigger
+            function setupAuthListener() {
+                if (!window.firebase) { setTimeout(setupAuthListener, 100); return; } // Wait for Firebase to be ready
+                
+                window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
+                    if (user) {
+                        console.log("Auth state changed: User is logged in.", user.email);
+                        userStatus.textContent = user.email;
+                        userStatus.classList.remove('hidden');
+                        loginButton.classList.add('hidden');
+                        logoutButton.classList.remove('hidden');
+                        fetchEventsFromFirestore(); // Load data from Firestore now that user is logged in
+                    } else {
+                        console.log("Auth state changed: User is logged out.");
+                        userStatus.textContent = '';
+                        userStatus.classList.add('hidden');
+                        loginButton.classList.remove('hidden');
+                        logoutButton.classList.add('hidden');
+                        if (eventDataTable) { eventDataTable.clear().draw(); } // Clear the table on logout
+                        dataFreshnessElement.textContent = "Please log in to view event data.";
+                    }
+                });
+            }
+            setupAuthListener();
+
+
+            // ... (All filter, modal, and chart logic remains here)
             let currentSourceFilter = "All", currentDayFilter = "All";
             function applyFilters() {
                 if(!eventDataTable) return; 
