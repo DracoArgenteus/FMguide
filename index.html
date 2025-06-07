@@ -12,27 +12,32 @@
     
     <!-- Firebase SDK -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, onSnapshot, addDoc, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+        import { getFirestore, collection, getDocs, onSnapshot, addDoc, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
       
+        // =================================================================================
+        // YOUR FIREBASE CONFIGURATION OBJECT GOES HERE
+        // =================================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyAwNsvDxANT6VKgWRl7bOu4FkTkmahKoss",
             authDomain: "fm-app-c58ab.firebaseapp.com",
             projectId: "fm-app-c58ab",
-            storageBucket: "fm-app-c58ab.firebasestorage.app",
+            storageBucket: "fm-app-c58ab.appspot.com",
             messagingSenderId: "640978558377",
             appId: "1:640978558377:web:055e05ac645d49904d38b8",
             measurementId: "G-9GBEZCE9NG"
         };
 
+        // Initialize Firebase
         try {
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const db = getFirestore(app);
             const analytics = getAnalytics(app);
 
+            // Make Firebase services globally available for the main script
             window.firebase = { app, auth, db, analytics, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, onSnapshot, addDoc, query, where, deleteDoc, doc };
             console.log("Firebase initialized successfully.");
         } catch (e) {
@@ -53,7 +58,6 @@
         .invitation-only:hover { background-color: rgba(254, 240, 138, 0.7) !important; }
         .dark .invitation-only { background-color: rgba(161, 98, 7, 0.25) !important; }
         .dark .invitation-only:hover { background-color: rgba(161, 98, 7, 0.35) !important; }
-        #statsSectionContainer { transition: max-height 0.7s ease-in-out, padding 0.5s ease-in-out, opacity 0.5s ease-in-out, margin-bottom 0.5s ease-in-out; overflow: hidden; }
 
         /* Calendar View Styles */
         #calendarView {
@@ -77,23 +81,52 @@
         .calendar-timeslot { background-color: #ffffff; position: relative; }
         .dark .calendar-timeslot { background-color: #111827; }
         .calendar-event {
-            position: absolute; width: 100%; padding: 0.25rem; border-radius: 0.25rem;
+            position: absolute; padding: 0.25rem; border-radius: 0.25rem;
             overflow: hidden; font-size: 0.75rem; cursor: pointer; border-left-width: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column;
         }
-        .calendar-event-inner { display: flex; flex-direction: column; height: 100%; color: #1f2937; }
+        .calendar-event-inner { color: #1f2937; height: 100%; display: flex; flex-direction: column; }
+        .dark .calendar-event-inner { color: #f9fafb; }
         .event-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .event-location { font-style: italic; }
+        .event-location { font-style: italic; opacity: 0.8; }
         .event-attendees { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; padding-top: 4px; }
         .attendee-pill {
             padding: 2px 6px; font-size: 0.7rem; border-radius: 9999px;
             font-weight: 500; color: white;
         }
+        
+        .view-toggle-button.active-view {
+            background-color: #ffffff;
+            color: #2563eb;
+        }
+        .dark .view-toggle-button.active-view {
+            background-color: #374151;
+            color: #60a5fa;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
     <!-- Auth Modal and Description Modal HTML remains the same -->
-    <!-- ... -->
+    <div id="authModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[1051]">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm m-4">
+            <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Login / Sign Up</h3>
+                <button id="closeAuthModalButton" class="text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            <div class="py-4 space-y-4">
+                <input id="authEmail" type="email" placeholder="Email" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                <input id="authPassword" type="password" placeholder="Password (min. 6 characters)" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                <p id="authError" class="text-sm text-red-500 hidden"></p>
+            </div>
+            <div class="flex justify-end gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button id="authSignUpButton" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500">Sign Up</button>
+                <button id="authLoginButton" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Login</button>
+            </div>
+        </div>
+    </div>
+    <div id="descriptionModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">...</div>
     
     <div class="container mx-auto p-4 md:p-8">
         <header class="mb-4 text-center relative"> 
@@ -124,16 +157,6 @@
         <!-- Table View -->
         <div id="tableView" class="view-section">
              <div class="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-4">
-                    <div>
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Source:</h3>
-                        <div class="source-filter-buttons flex flex-wrap gap-2">...</div>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700 dark:text-gray-300">Filter by Day:</h3>
-                        <div class="filter-buttons flex flex-wrap gap-2">...</div>
-                    </div>
-                </div>
                 <div class="table-container"><table id="eventTable" class="display"><thead></thead><tbody></tbody></table></div>
             </div>
         </div>
@@ -148,129 +171,157 @@
         <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">...</footer>
     </div>
     
-    <!-- Modals remain the same -->
-    <!-- ... -->
-
     <script>
-        // ... (Header and initial variable declarations)
-
         $(document).ready(function() {
             // --- DELEGATION CONFIGURATION ---
-            const delegation = {
-                "user1@example.com": { name: "Alex", color: "bg-blue-500", borderColor: "border-blue-700" },
-                "user2@example.com": { name: "Ben", color: "bg-green-500", borderColor: "border-green-700" },
-                "user3@example.com": { name: "Carla", color: "bg-purple-500", borderColor: "border-purple-700" },
-                "user4@example.com": { name: "Dorte", color: "bg-pink-500", borderColor: "border-pink-700" },
-                "user5@example.com": { name: "Erik", color: "bg-orange-500", borderColor: "border-orange-700" }
+            const delegationConfig = {
+                "user1@example.com": { name: "Alex", color: "bg-blue-400", borderColor: "border-blue-600" },
+                "user2@example.com": { name: "Ben", color: "bg-green-400", borderColor: "border-green-600" },
+                "user3@example.com": { name: "Carla", color: "bg-purple-400", borderColor: "border-purple-600" },
+                "user4@example.com": { name: "Dorte", color: "bg-pink-400", borderColor: "border-pink-600" },
+                "user5@example.com": { name: "Erik", color: "bg-orange-400", borderColor: "border-orange-600" }
             };
-            const everyoneColor = { name: "Everyone", color: "bg-yellow-400", borderColor: "border-yellow-600" };
+            const everyoneColorConfig = { name: "Everyone", color: "bg-yellow-400", borderColor: "border-yellow-600" };
             // --- END CONFIGURATION ---
 
+            const UNIFIED_HEADERS = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource", "Actions"];
             let eventDataTable = null;
             let allEvents = [];
-            let allSignups = {};
+            let allSignups = {}; 
             let currentUser = null;
 
-            // ... (All other variable declarations)
+            const tableView = document.getElementById('tableView');
+            const calendarView = document.getElementById('calendarViewContainer');
+            const showTableViewButton = document.getElementById('showTableViewButton');
+            const showCalendarViewButton = document.getElementById('showCalendarViewButton');
+            const authModal = document.getElementById('authModal');
+            const closeAuthModalButton = document.getElementById('closeAuthModalButton');
+            const authSignUpButton = document.getElementById('authSignUpButton');
+            const authLoginButton = document.getElementById('authLoginButton');
+            const authError = document.getElementById('authError');
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const userStatus = document.getElementById('user-status');
+            const themeToggleButton = document.getElementById('theme-toggle');
+            
+            // --- THEME LOGIC ---
+            function applyTheme(isDark) { /* ... same as before ... */ }
+            // Initial theme setup
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                applyTheme(true);
+            } else {
+                applyTheme(false);
+            }
+            themeToggleButton.addEventListener('click', function() {
+                const isDark = !document.documentElement.classList.contains('dark');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                applyTheme(isDark);
+            });
 
             // --- AUTH LOGIC ---
+            function openAuthModal() { authModal.style.display = "flex"; }
+            function closeAuthModal() { authModal.style.display = "none"; document.getElementById('authError').textContent = ''; document.getElementById('authError').classList.add('hidden'); }
+            loginButton.addEventListener('click', openAuthModal);
+            closeAuthModalButton.addEventListener('click', closeAuthModal);
+            authSignUpButton.addEventListener('click', () => {
+                if (!window.firebase) { alert("Firebase not ready."); return; }
+                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, document.getElementById('authEmail').value, document.getElementById('authPassword').value)
+                    .then(() => closeAuthModal())
+                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
+            });
+            authLoginButton.addEventListener('click', () => {
+                if (!window.firebase) { alert("Firebase not ready."); return; }
+                window.firebase.signInWithEmailAndPassword(window.firebase.auth, document.getElementById('authEmail').value, document.getElementById('authPassword').value)
+                    .then(() => closeAuthModal())
+                    .catch(error => { authError.textContent = error.message; authError.classList.remove('hidden'); });
+            });
+            logoutButton.addEventListener('click', () => {
+                if (window.firebase) window.firebase.signOut(window.firebase.auth);
+            });
+
+            // --- DATA & APP LOGIC ---
+            let unsubscribeSignups = null;
             function setupAuthListener() {
-                if (!window.firebase) { setTimeout(setupAuthListener, 100); return; } 
+                if (!window.firebase) { setTimeout(setupAuthListener, 100); return; }
                 window.firebase.onAuthStateChanged(window.firebase.auth, async (user) => {
                     if (user) {
                         currentUser = user;
-                        // ... (Update UI as before)
+                        userStatus.textContent = `Logged in: ${user.email}`;
+                        userStatus.classList.remove('hidden');
+                        loginButton.classList.add('hidden');
+                        logoutButton.classList.remove('hidden');
                         allEvents = await fetchEventsFromFirestore();
-                        setupSignupsListener(); // Start listening for signup changes
-                        initializeDataTable(allEvents); 
+                        initializeDataTable(allEvents);
+                        setupSignupsListener();
                     } else {
                         currentUser = null;
-                        // ... (Update UI as before)
+                        if (unsubscribeSignups) unsubscribeSignups();
+                        userStatus.classList.add('hidden');
+                        loginButton.classList.remove('hidden');
+                        logoutButton.classList.add('hidden');
                         if (eventDataTable) { eventDataTable.clear().draw(); }
                     }
                 });
             }
 
-            // --- DATA LOGIC ---
-            async function fetchEventsFromFirestore() { /* ... unchanged ... */ }
-
-            // --- REAL-TIME SIGNUP LOGIC ---
-            let unsubscribeSignups = null;
+            async function fetchEventsFromFirestore() {
+                const { db, collection, getDocs } = window.firebase;
+                const querySnapshot = await getDocs(collection(db, "events"));
+                const firestoreEvents = [];
+                querySnapshot.forEach((doc) => {
+                    firestoreEvents.push({ id: doc.id, ...doc.data() });
+                });
+                return firestoreEvents;
+            }
+            
             function setupSignupsListener() {
-                if (unsubscribeSignups) { unsubscribeSignups(); }
-                if (!window.firebase || !currentUser) return;
-                
+                if (unsubscribeSignups) unsubscribeSignups();
                 const { db, collection, onSnapshot } = window.firebase;
-                const q = collection(db, "signups");
-
-                unsubscribeSignups = onSnapshot(q, (querySnapshot) => {
-                    console.log("Real-time signup data received.");
+                const signupsRef = collection(db, "signups");
+                unsubscribeSignups = onSnapshot(signupsRef, (querySnapshot) => {
                     allSignups = {};
                     querySnapshot.forEach((doc) => {
                         const signup = doc.data();
-                        if (!allSignups[signup.eventId]) { allSignups[signup.eventId] = {}; }
-                        allSignups[signup.eventId][signup.userId] = doc.id; 
+                        if (!allSignups[signup.eventId]) allSignups[signup.eventId] = {};
+                        allSignups[signup.eventId][signup.userId] = { docId: doc.id, userEmail: signup.userEmail };
                     });
-                    
-                    if(eventDataTable) eventDataTable.draw(false);
-                    renderCalendar(); 
+                    if (eventDataTable) eventDataTable.draw(false);
+                    if (!calendarView.classList.contains('hidden')) renderCalendar();
                 });
             }
 
             function handleSignUp(eventId, isSignedUp) {
-                if (!window.firebase || !currentUser) { alert("Please log in to sign up for events."); return; }
                 const { db, collection, addDoc, deleteDoc, doc } = window.firebase;
-
                 if (isSignedUp) {
-                    const signupId = allSignups[eventId]?.[currentUser.uid];
-                    if (signupId) {
-                        deleteDoc(doc(db, "signups", signupId));
-                    }
+                    const signupDocId = allSignups[eventId]?.[currentUser.uid]?.docId;
+                    if (signupDocId) deleteDoc(doc(db, "signups", signupDocId));
                 } else {
-                    addDoc(collection(db, "signups"), {
-                        eventId: eventId,
-                        userId: currentUser.uid,
-                        userEmail: currentUser.email
-                    });
+                    addDoc(collection(db, "signups"), { eventId, userId: currentUser.uid, userEmail: currentUser.email });
                 }
             }
 
-            // --- TABLE & CALENDAR LOGIC ---
             function initializeDataTable(data) {
-                // Add a new column for "Actions"
-                const headersWithActions = [...UNIFIED_HEADERS, "Actions"];
-                let headerHtml = '<tr>'; 
-                headersWithActions.forEach(h => {headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); 
-                headerHtml+='</tr>';
-                $('#eventTable thead').html(headerHtml);
-                
-                const colIdx = {}; headersWithActions.forEach((h,i) => colIdx[h]=i);
-
+                // ... same as previous version, but now includes the Actions column ...
+                const colIdx = {}; UNIFIED_HEADERS.forEach((h,i) => colIdx[h]=i);
                 if(eventDataTable) { eventDataTable.destroy(); $('#eventTable tbody').empty(); }
+                let headerHtml = '<tr>'; UNIFIED_HEADERS.forEach(h => {headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`;}); headerHtml+='</tr>';
+                $('#eventTable thead').html(headerHtml);
 
                 eventDataTable = $('#eventTable').DataTable({
-                    data: data.map(e => [...UNIFIED_HEADERS.map(h => e[h] || ''), '']), // Add placeholder for Actions
-                    // ... (rest of DataTable config)
+                    data: data.map(e => [...UNIFIED_HEADERS.slice(0, -1).map(h => e[h] || ''), '']),
+                    order: [[colIdx.Weekday,'asc'],[colIdx.TimeRange,'asc']],
                     columnDefs: [
-                        // ... all previous columnDefs
-                        {
-                            targets: colIdx.Actions,
-                            orderable: false,
-                            className: "text-center",
-                            render: function(data, type, row, meta) {
-                                const eventId = allEvents[meta.row].id;
-                                const isSignedUp = allSignups[eventId]?.[currentUser?.uid];
-                                if (isSignedUp) {
-                                    return `<button data-event-id="${eventId}" class="signup-btn bg-red-500 text-white px-2 py-1 text-xs rounded">Cancel</button>`;
-                                } else {
-                                    return `<button data-event-id="${eventId}" class="signup-btn bg-green-500 text-white px-2 py-1 text-xs rounded">Sign Up</button>`;
-                                }
-                            }
+                        { targets: colIdx.Actions, orderable: false, className: "text-center",
+                          render: function(d, t, row, meta) {
+                            const eventId = allEvents[meta.row].id;
+                            if (!eventId || !currentUser) return '';
+                            const isSignedUp = allSignups[eventId]?.[currentUser.uid];
+                            return `<button data-event-id="${eventId}" class="signup-btn px-2 py-1 text-xs rounded ${isSignedUp ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}">${isSignedUp ? 'Cancel' : 'Sign Up'}</button>`;
+                          }
                         }
                     ]
                 });
-
-                $('#eventTable tbody').on('click', '.signup-btn', function() {
+                 $('#eventTable tbody').on('click', '.signup-btn', function() {
                     const eventId = $(this).data('eventId');
                     const isSignedUp = $(this).text() === 'Cancel';
                     handleSignUp(eventId, isSignedUp);
