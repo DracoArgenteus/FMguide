@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class=""> <!-- `dark` class is toggled here by JS -->
-<head>
+<html lang="en" class=""> <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Folkemødet 2025 - Combined Event Schedule</title>
@@ -9,6 +8,44 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <script type="module">
+        // Import the functions you need from the SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+      
+        // =================================================================================
+        // YOUR FIREBASE CONFIGURATION OBJECT GOES HERE
+        // Replace the placeholder values with the actual keys from your Firebase project.
+        // =================================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwNsvDxANT6VKgWRl7bOu4FkTkmahKoss",
+            authDomain: "fm-app-c58ab.firebaseapp.com",
+            projectId: "fm-app-c58ab",
+            storageBucket: "fm-app-c58ab.firebasestorage.app",
+            messagingSenderId: "640978558377",
+            appId: "1:640978558377:web:055e05ac645d49904d38b8",
+            measurementId: "G-9GBEZCE9NG"
+        };
+
+        // Initialize Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+            const analytics = getAnalytics(app);
+
+            // Make Firebase services globally available for the main script
+            window.firebase = { app, auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged };
+            console.log("Firebase initialized successfully.");
+        } catch (e) {
+            console.error("Error initializing Firebase. Please check your firebaseConfig object.", e);
+            alert("Could not initialize Firebase. Check your configuration and console for errors.");
+        }
+    </script>
+
     <style>
         /* Custom CSS to style DataTables elements to match Tailwind's dark theme */
         table.dataTable {
@@ -58,10 +95,37 @@
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <div id="authModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-[1051]">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm m-4">
+            <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 id="authModalTitle" class="text-xl font-semibold text-gray-900 dark:text-white">Login / Sign Up</h3>
+                <button id="closeAuthModalButton" class="text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            <div class="py-4 space-y-4">
+                <input id="authEmail" type="email" placeholder="Email" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                <input id="authPassword" type="password" placeholder="Password (min. 6 characters)" class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                <p id="authError" class="text-sm text-red-500 hidden"></p>
+            </div>
+            <div class="flex justify-end gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button id="authSignUpButton" class="px-4 py-2 text-sm font-medium rounded-md bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500">Sign Up</button>
+                <button id="authLoginButton" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Login</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="container mx-auto p-4 md:p-8">
-        <header class="mb-4 text-center"> 
+        <header class="mb-4 text-center relative"> 
+            <div class="absolute top-0 left-0">
+                <span id="user-status" class="text-sm text-gray-600 dark:text-gray-400 hidden"></span>
+            </div>
             <h1 class="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-500">Folkemødet 2025 - Combined Event Schedule</h1>
             <p id="dataFreshness" class="text-gray-500 dark:text-gray-400 text-sm mt-2">Loading data update time...</p>
+            <div id="auth-controls" class="absolute top-0 right-0 flex items-center gap-3">
+                <button id="login-button" class="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700">Login</button>
+                <button id="logout-button" class="px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 hidden">Logout</button>
+            </div>
         </header>
 
         <div class="flex justify-end items-center gap-4 mb-4">
@@ -79,30 +143,12 @@
             <div class="p-6">
                 <h3 class="text-xl font-bold text-blue-600 dark:text-blue-500 mb-4 text-center">Filtered Statistics</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <!-- Stat Cards -->
-                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Events</h4>
-                        <p id="stat-total-events" class="text-3xl font-bold text-gray-900 dark:text-white">0</p>
-                    </div>
-                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Busiest Hour</h4>
-                        <p id="stat-busiest-hour" class="text-3xl font-bold text-gray-900 dark:text-white">--:--</p>
-                    </div>
-                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Busiest Location</h4>
-                        <p id="stat-busiest-location" class="text-xl font-semibold text-gray-900 dark:text-white truncate" title="N/A">N/A</p>
-                    </div>
-                     <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
-                        <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Invitation Only</h4>
-                        <p id="stat-invitation-only" class="text-3xl font-bold text-gray-900 dark:text-white">0</p>
-                    </div>
+                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center"><h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Events</h4><p id="stat-total-events" class="text-3xl font-bold text-gray-900 dark:text-white">0</p></div>
+                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center"><h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Busiest Hour</h4><p id="stat-busiest-hour" class="text-3xl font-bold text-gray-900 dark:text-white">--:--</p></div>
+                    <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center"><h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Busiest Location</h4><p id="stat-busiest-location" class="text-xl font-semibold text-gray-900 dark:text-white truncate" title="N/A">N/A</p></div>
+                     <div class="stat-card bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center"><h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Invitation Only</h4><p id="stat-invitation-only" class="text-3xl font-bold text-gray-900 dark:text-white">0</p></div>
                 </div>
-                <div class="charts-grid grid grid-cols-1 gap-6">
-                    <div class="chart-wrapper min-h-[300px]">
-                        <h4 class="text-lg font-semibold mb-2 text-center text-gray-700 dark:text-gray-300">Events per Hour</h4>
-                        <canvas id="eventsPerHourChart"></canvas>
-                    </div>
-                </div>
+                <div class="charts-grid grid grid-cols-1 gap-6"><div class="chart-wrapper min-h-[300px]"><h4 class="text-lg font-semibold mb-2 text-center text-gray-700 dark:text-gray-300">Events per Hour</h4><canvas id="eventsPerHourChart"></canvas></div></div>
             </div>
         </div>
         
@@ -130,13 +176,7 @@
                     </div>
                 </div>
             </div>
-            
-            <div class="table-container">
-                <table id="eventTable" class="display">
-                    <thead></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <div class="table-container"><table id="eventTable" class="display"><thead></thead><tbody></tbody></table></div>
         </div>
 
         <footer class="mt-12 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -144,7 +184,6 @@
         </footer>
     </div>
 
-    <!-- Modal Structure -->
     <div id="descriptionModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl m-4">
             <div class="flex justify-between items-center pb-3 border-b border-gray-200 dark:border-gray-700">
@@ -166,6 +205,9 @@
         const socialDataMap = {"title":"EventTitle", "summary":"Description", "url":"EventURL", "location":"Location", "day":"Weekday", "startTime":"_StartTime", "endTime":"_EndTime", "organizers":"Organizers", "theme":"Theme"};
 
         $(document).ready(function() {
+            // All script logic, including data loading, normalization,
+            // DataTable initialization, and all event listeners, goes here.
+            
             const privateCsvPath = 'data/folkemoedet_private_events.csv';
             const officialCsvPath = 'data/official_events_combined.csv';
             const socialCsvPath = 'data/social_events.csv';
@@ -216,6 +258,82 @@
                 applyTheme(isDark);
             });
             // --- END THEME LOGIC ---
+
+            // --- FIREBASE AUTH LOGIC ---
+            const authModal = document.getElementById('authModal');
+            const authEmailInput = document.getElementById('authEmail');
+            const authPasswordInput = document.getElementById('authPassword');
+            const authSignUpButton = document.getElementById('authSignUpButton');
+            const authLoginButton = document.getElementById('authLoginButton');
+            const authError = document.getElementById('authError');
+            const closeAuthModalButton = document.getElementById('closeAuthModalButton');
+            
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const userStatus = document.getElementById('user-status');
+            
+            function openAuthModal() { authModal.style.display = "flex"; }
+            function closeAuthModal() { authModal.style.display = "none"; authError.classList.add('hidden'); }
+
+            loginButton.addEventListener('click', openAuthModal);
+            closeAuthModalButton.addEventListener('click', closeAuthModal);
+
+            authSignUpButton.addEventListener('click', () => {
+                if (!window.firebase) { alert("Firebase is not initialized."); return; }
+                const email = authEmailInput.value;
+                const password = authPasswordInput.value;
+                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password)
+                    .then((userCredential) => {
+                        console.log("User signed up successfully:", userCredential.user);
+                        closeAuthModal();
+                    })
+                    .catch((error) => {
+                        console.error("Sign up error:", error);
+                        authError.textContent = error.message;
+                        authError.classList.remove('hidden');
+                    });
+            });
+
+            authLoginButton.addEventListener('click', () => {
+                if (!window.firebase) { alert("Firebase is not initialized."); return; }
+                const email = authEmailInput.value;
+                const password = authPasswordInput.value;
+                window.firebase.signInWithEmailAndPassword(window.firebase.auth, email, password)
+                    .then((userCredential) => {
+                        console.log("User logged in successfully:", userCredential.user);
+                        closeAuthModal();
+                    })
+                    .catch((error) => {
+                        console.error("Login error:", error);
+                        authError.textContent = error.message;
+                        authError.classList.remove('hidden');
+                    });
+            });
+
+            logoutButton.addEventListener('click', () => {
+                if (!window.firebase) return;
+                window.firebase.signOut(window.firebase.auth).catch(error => console.error("Logout error:", error));
+            });
+
+            // Listen for authentication state changes
+            if (window.firebase) {
+                window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
+                    if (user) {
+                        console.log("Auth state changed: User is logged in.", user.email);
+                        userStatus.textContent = user.email;
+                        userStatus.classList.remove('hidden');
+                        loginButton.classList.add('hidden');
+                        logoutButton.classList.remove('hidden');
+                    } else {
+                        console.log("Auth state changed: User is logged out.");
+                        userStatus.textContent = '';
+                        userStatus.classList.add('hidden');
+                        loginButton.classList.remove('hidden');
+                        logoutButton.classList.add('hidden');
+                    }
+                });
+            }
+            // --- END FIREBASE AUTH LOGIC ---
 
             function robustParseCSV(csvText) {
                 const data = []; let headers = [];
@@ -279,7 +397,6 @@
                     UNIFIED_HEADERS.forEach(h => { if (h !== 'DataSource') normalizedEvent[h] = ''; });
                     for (const rh in map) if (rawEvent.hasOwnProperty(rh)) normalizedEvent[map[rh]] = rawEvent[rh];
                     
-                    // Specific normalization for 'Private' source
                     if (sourceName === "Private" && normalizedEvent.TimeRange) {
                         normalizedEvent.TimeRange = normalizedEvent.TimeRange.replace(/\./g, ':');
                     }
