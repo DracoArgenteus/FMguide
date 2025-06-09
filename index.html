@@ -21,7 +21,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
-        import { getFirestore, collection, getDocs, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
       
         // Your Firebase configuration object
         const firebaseConfig = {
@@ -45,7 +45,8 @@
                 createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, 
                 collection, getDocs, analytics,
                 GoogleAuthProvider, signInWithPopup,
-                doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField
+                doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField,
+                arrayUnion, arrayRemove
             };
             console.log("Firebase initialized successfully.");
         } catch (e) {
@@ -199,7 +200,7 @@
             let eventDataTable = null, mainModalInstance, teamsModalInstance, authModalInstance;
             let allEvents = [], teamFavorites = new Map(), teamMembers = new Map();
             let favoriteEvents = new Set(), currentUserId = null, currentTeamId = null;
-            let unsubscribeFavorites = () => {}, unsubscribeUser = () => {}, unsubscribeTeam = () => {};
+            let unsubscribeFavorites = () => {}, unsubscribeUser = () => {}, unsubscribeTeam = () => {}, unsubscribeTeamFavorites = () => {};
 
             // --- DOM ELEMENT GETTERS ---
             const getEl = (id) => document.getElementById(id);
@@ -230,15 +231,25 @@
             // --- FIREBASE AUTH & DATA LOGIC ---
             async function toggleFavorite(eventId, isFavorited) {
                 if (!currentUserId || !window.firebase) return;
-                const { db, doc, setDoc, deleteDoc } = window.firebase;
+                const { db, doc, setDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove } = window.firebase;
                 const favDocRef = doc(db, "users", currentUserId, "favorites", eventId);
                 try {
-                    if (isFavorited) await deleteDoc(favDocRef);
-                    else await setDoc(favDocRef, { addedAt: new Date() });
+                    if (isFavorited) { // Un-favoriting
+                        await deleteDoc(favDocRef);
+                        if (currentTeamId) {
+                            const teamFavRef = doc(db, 'teams', currentTeamId, 'team_favorites', eventId);
+                            await updateDoc(teamFavRef, { favoritedBy: arrayRemove(currentUserId) });
+                        }
+                    } else { // Favoriting
+                        await setDoc(favDocRef, { addedAt: new Date() });
+                        if (currentTeamId) {
+                            const teamFavRef = doc(db, 'teams', currentTeamId, 'team_favorites', eventId);
+                            await setDoc(teamFavRef, { favoritedBy: arrayUnion(currentUserId) }, { merge: true });
+                        }
+                    }
                 } catch (error) { console.error("Error updating favorite:", error); }
             }
             
-            // ***FIXED***: Added Team Management Functions
             async function createTeam() {
                 if (!currentUserId || !window.firebase) return;
                 const { db, doc, writeBatch, collection } = window.firebase;
@@ -289,7 +300,7 @@
                 if (!window.firebase) { setTimeout(setupAuthListener, 100); return; }
                 const { auth, onAuthStateChanged, db, doc, onSnapshot, setDoc, collection } = window.firebase;
                 onAuthStateChanged(auth, (user) => {
-                    unsubscribeFavorites(); unsubscribeUser(); unsubscribeTeam();
+                    unsubscribeFavorites(); unsubscribeUser(); unsubscribeTeam(); unsubscribeTeamFavorites();
                     teamFavorites.clear(); teamMembers.clear();
                     if (user) {
                         currentUserId = user.uid;
@@ -327,7 +338,7 @@
             }
 
             function listenToTeamChanges() {
-                unsubscribeTeam();
+                unsubscribeTeam(); unsubscribeTeamFavorites();
                 teamMembers.clear(); teamFavorites.clear();
                 if (!currentTeamId || !window.firebase) { renderCalendarView(); updateTeamViewUI(); return; }
                 
@@ -335,20 +346,31 @@
                 const teamRef = doc(db, 'teams', currentTeamId);
                 
                 unsubscribeTeam = onSnapshot(teamRef, (teamDoc) => {
+                    unsubscribeTeamFavorites();
                     if (teamDoc.exists()) {
                         teamMembers = new Map(Object.entries(teamDoc.data().members || {}));
                         updateTeamViewUI();
                         
-                        teamMembers.forEach((name, memberId) => {
-                             const memberFavsRef = collection(db, 'users', memberId, 'favorites');
-                             onSnapshot(memberFavsRef, (snapshot) => {
-                                 const favs = new Set();
-                                 snapshot.forEach(favDoc => favs.add(favDoc.id));
-                                 teamFavorites.set(memberId, favs);
-                                 if (document.getElementById('mainModal').classList.contains('show')) {
-                                     renderCalendarView();
-                                 }
-                             });
+                        const teamFavsRef = collection(db, 'teams', currentTeamId, 'team_favorites');
+                        unsubscribeTeamFavorites = onSnapshot(teamFavsRef, (snapshot) => {
+                            const newTeamFavorites = new Map();
+                            teamMembers.forEach((name, memberId) => newTeamFavorites.set(memberId, new Set()));
+
+                            snapshot.forEach(doc => {
+                                const eventId = doc.id;
+                                const data = doc.data();
+                                if (data.favoritedBy && Array.isArray(data.favoritedBy)) {
+                                    data.favoritedBy.forEach(userId => {
+                                        if (newTeamFavorites.has(userId)) {
+                                            newTeamFavorites.get(userId).add(eventId);
+                                        }
+                                    });
+                                }
+                            });
+                            teamFavorites = newTeamFavorites;
+                            if (document.getElementById('mainModal').classList.contains('show')) {
+                                renderCalendarView();
+                            }
                         });
                     } else {
                         currentTeamId = null;
@@ -410,22 +432,71 @@
                         { targets: [colIdx.Description, colIdx.EventURL, colIdx.Organizers, colIdx.DataSource, colIdx.Theme, colIdx.id], visible: false }
                     ]
                 });
+                
+                // ***FIXED*** Added listener for table draw events to update visualizations
+                eventDataTable.on('draw.dt search.dt', updateVisualizations);
             }
             
             // --- UI RENDER & EVENT LISTENERS ---
             setupAuthListener();
-            getEl('authLoginButton').addEventListener('click', () => { /* ... */ });
-            // ... all other listeners
-            teamButton.addEventListener('click', () => teamsModalInstance.show());
-            calendarButton.addEventListener('click', () => {
-                renderCalendarView();
-                mainModalTabs.calendar.show();
-                mainModalInstance.show();
+            getEl('login-button').addEventListener('click', () => authModalInstance.show());
+            getEl('authSignUpButton').addEventListener('click', () => {
+                if (!window.firebase) return;
+                window.firebase.createUserWithEmailAndPassword(window.firebase.auth, getEl('authEmail').value, getEl('authPassword').value)
+                    .then(userCredential => authModalInstance.hide())
+                    .catch(error => { getEl('authError').textContent = error.message; getEl('authError').style.display = "block"; });
             });
+            getEl('authLoginButton').addEventListener('click', () => {
+                if (!window.firebase) return;
+                window.firebase.signInWithEmailAndPassword(window.firebase.auth, getEl('authEmail').value, getEl('authPassword').value)
+                    .then(userCredential => authModalInstance.hide())
+                    .catch(error => { getEl('authError').textContent = error.message; getEl('authError').style.display = "block"; });
+            });
+            getEl('googleLoginButton').addEventListener('click', () => {
+                if (!window.firebase) return;
+                const provider = new window.firebase.GoogleAuthProvider();
+                window.firebase.signInWithPopup(window.firebase.auth, provider)
+                    .then(result => authModalInstance.hide())
+                    .catch(error => { getEl('authError').textContent = error.message; getEl('authError').style.display = "block"; });
+            });
+            getEl('logout-button').addEventListener('click', () => {
+                if (window.firebase) window.firebase.signOut(window.firebase.auth);
+            });
+
+            teamButton.addEventListener('click', () => {
+                if(currentUserId) {
+                    teamsModalInstance.show();
+                } else {
+                    authModalInstance.show();
+                }
+            });
+
+            calendarButton.addEventListener('click', () => {
+                if(currentUserId) {
+                    renderCalendarView();
+                    mainModalTabs.calendar.show();
+                    mainModalInstance.show();
+                } else {
+                    authModalInstance.show();
+                }
+            });
+
             getEl('create-team-button').addEventListener('click', createTeam);
             getEl('join-team-button').addEventListener('click', joinTeam);
             getEl('leave-team-button').addEventListener('click', leaveTeam);
             getEl('copy-team-id').addEventListener('click', () => navigator.clipboard.writeText(currentTeamId));
+
+            // ***FIXED*** Added listeners for filter buttons
+            let currentSourceFilter = "All", currentDayFilter = "All";
+            function applyFilters() {
+                if (!eventDataTable) return;
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
+                const dsIdx = colIdx.DataSource, wdIdx = colIdx.Weekday;
+                eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false).draw(false);
+                eventDataTable.column(wdIdx).search(currentDayFilter === "All" ? '' : '^' + currentDayFilter + '$', true, false).draw();
+            }
+            $('.source-filter-buttons .btn-check').on('change', function() { currentSourceFilter = $(this).data('source'); applyFilters(); });
+            $('.filter-buttons .btn-check').on('change', function() { currentDayFilter = $(this).data('day'); applyFilters(); });
 
             $('#eventTable tbody').on('click', 'tr', function () {
                 const rowData = eventDataTable.row(this).data();
@@ -437,13 +508,14 @@
             
             $('#eventTable tbody').on('click', '.favorite-icon', function (e) {
                 e.stopPropagation();
+                if(!currentUserId) { authModalInstance.show(); return; }
                 const eventId = $(this).data('event-id');
                 const isFavorited = favoriteEvents.has(eventId);
                 toggleFavorite(eventId, isFavorited);
             });
 
             function renderDetailsView(rowData) {
-                 const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
                 const eventData = {}; ALL_DATA_HEADERS.forEach(header => { eventData[header] = rowData[colIdx[header]]; });
                 
                 let modalHtml = `<h5 class="mb-3">${eventData.EventTitle}</h5><ul class="list-group list-group-flush">`;
@@ -500,7 +572,9 @@
                             calendarHtml += `<div class="time-line" style="top: ${top}px;"></div>`;
                         }
 
-                        eventsByDay[day].forEach(({event, users}) => {
+                        // A simple algorithm to prevent overlapping
+                        const placedEvents = [];
+                        eventsByDay[day].sort((a,b) => (a.event.TimeRange || "").localeCompare(b.event.TimeRange || "")).forEach(({event, users}) => {
                             const timeParts = (event.TimeRange || "00:00-00:00").split('-');
                             const start = timeParts[0].split(':');
                             const end = timeParts.length > 1 ? timeParts[1].split(':') : start;
@@ -518,7 +592,15 @@
                             }
                             const userHtml = users.map(u => u.name).join(', ');
 
-                            calendarHtml += `<div class="${eventClass}" style="top: ${top}px; height: ${height}px; width: 150px;"><strong>${event.EventTitle}</strong><br><small><i>${userHtml}</i></small></div>`;
+                            // Find a non-overlapping column
+                            let column = 0;
+                            while(placedEvents.some(p => p.column === column && top < p.end && (top + height) > p.top)) {
+                                column++;
+                            }
+                            placedEvents.push({top, end: top + height, column});
+                            const left = 65 + (column * 155); // 150px width + 5px margin
+
+                            calendarHtml += `<div class="${eventClass}" style="top: ${top}px; height: ${height}px; width: 150px; left: ${left}px;"><strong>${event.EventTitle}</strong><br><small><i>${userHtml}</i></small></div>`;
                         });
                         calendarHtml += `</div></div>`;
                     }
@@ -540,6 +622,58 @@
                     teamInfoView.style.display = 'none'; noTeamView.style.display = 'block';
                 }
             }
+
+            function updateVisualizations() {
+                if (!eventDataTable) return;
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
+                const fData = eventDataTable.rows({ search: 'applied' }).data().toArray();
+                
+                getEl('stat-total-events').textContent = fData.length;
+                let invOnlyCount = 0;
+                const locCounts = {}, hrCnt = {};
+                for (let i = 6; i < 24; i++) hrCnt[i.toString().padStart(2, '0')] = 0;
+
+                fData.forEach(r => {
+                    const tr = r[colIdx.TimeRange];
+                    if (tr) { const sm = tr.match(/^(\d{2}):\d{2}/); if (sm && hrCnt.hasOwnProperty(sm[1])) hrCnt[sm[1]]++; }
+                    const loc = r[colIdx.Location]; if (loc && loc.trim()) locCounts[loc] = (locCounts[loc] || 0) + 1;
+                    if ((r[colIdx.EventTitle] || '').includes('!!Kun med invitation!!') || (r[colIdx.Description] || '').includes('!!Kun med invitation!!')) invOnlyCount++;
+                });
+
+                getEl('stat-invitation-only').textContent = invOnlyCount;
+                const busiestHour = Object.entries(hrCnt).reduce((max, e) => e[1] > max[1] ? e : max, [null, -1]);
+                getEl('stat-busiest-hour').textContent = busiestHour[1] > 0 ? `${busiestHour[0]}:00` : "--:--";
+                const busiestLoc = Object.entries(locCounts).reduce((max, e) => e[1] > max[1] ? e : max, [null, -1]);
+                const busiestLocEl = getEl('stat-busiest-location');
+                busiestLocEl.textContent = busiestLoc[0] || "N/A";
+                busiestLocEl.title = busiestLoc[0] || "N/A";
+
+                const eventsPerHourChartInstance = Chart.getChart("eventsPerHourChart");
+                if(eventsPerHourChartInstance) {
+                    eventsPerHourChartInstance.data.labels = Object.keys(hrCnt).sort();
+                    eventsPerHourChartInstance.data.datasets[0].data = Object.keys(hrCnt).sort().map(key => hrCnt[key]);
+                    eventsPerHourChartInstance.update();
+                }
+            }
+            
+            getEl('toggleStatsButton').addEventListener('click', (e) => {
+                const isExpanding = e.currentTarget.getAttribute('aria-expanded') !== 'true';
+                getEl('toggleStatsButtonText').textContent = isExpanding ? 'Hide Statistics' : 'Show Statistics';
+                 if(isExpanding) {
+                     const hctx = getEl('eventsPerHourChart');
+                     if(hctx) {
+                        let chart = Chart.getChart(hctx);
+                        if(!chart) {
+                            chart = new Chart(hctx.getContext('2d'), {
+                                type: 'bar',
+                                data: { labels: [], datasets: [{ label: 'Events/Hour', data: [], backgroundColor: 'rgba(221, 0, 121, 0.7)', borderColor: 'rgba(221, 0, 121, 1)', borderWidth: 1 }] },
+                                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
+                            });
+                        }
+                        updateVisualizations();
+                     }
+                 }
+            });
         });
     </script>
 </body>
