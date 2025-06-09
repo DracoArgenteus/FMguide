@@ -113,10 +113,13 @@
         html[data-mdb-theme="dark"] .dataTables_wrapper .form-outline {
             border-color: #4f4f4f;
         }
+        #eventTable tbody tr {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <!-- ***NEW*** Auth Modal -->
+    <!-- Auth Modal -->
     <div class="modal fade" id="authModal" tabindex="-1" aria-labelledby="authModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -149,7 +152,7 @@
         </div>
     </div>
     
-    <!-- ***NEW*** Navigation Bar -->
+    <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-body-tertiary fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand text-primary" href="#"><strong>Folkemødet 2025</strong></a>
@@ -216,7 +219,6 @@
                     <div class="col-md-6 mb-3 mb-md-0">
                         <h5 class="mb-2">Filter by Source:</h5>
                         <div class="btn-group source-filter-buttons" role="group">
-                             <!-- ***FIXED*** Changed label class from btn-primary to btn-outline-primary -->
                             <input type="radio" class="btn-check" name="sourceFilter" id="sourceAll" autocomplete="off" data-source="All" checked />
                             <label class="btn btn-outline-primary" for="sourceAll">All</label>
 
@@ -233,7 +235,6 @@
                     <div class="col-md-6">
                         <h5 class="mb-2">Filter by Day:</h5>
                         <div class="btn-group filter-buttons" role="group">
-                            <!-- ***FIXED*** Changed label class from btn-primary to btn-outline-primary -->
                            <input type="radio" class="btn-check" name="dayFilter" id="dayAll" autocomplete="off" data-day="All" checked />
                            <label class="btn btn-outline-primary" for="dayAll">All</label>
 
@@ -263,10 +264,12 @@
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="modalTitle">Event Description</h5>
+            <h5 class="modal-title" id="modalTitle">Event Details</h5>
             <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body"><p id="modalFullDescription" class="lead" style="white-space: pre-wrap;"></p></div>
+          <div class="modal-body" id="modalBodyContent">
+            <!-- Content will be dynamically injected here -->
+          </div>
         </div>
       </div>
     </div>
@@ -280,7 +283,8 @@
     
     <script>
         document.getElementById('currentYear').textContent = new Date().getFullYear();
-        const UNIFIED_HEADERS = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource"];
+        const ALL_DATA_HEADERS = ["EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource"];
+
 
         $(document).ready(function() {
             let eventDataTable = null;
@@ -293,7 +297,7 @@
             const dataFreshnessElement = getEl('dataFreshness');
             const toggleStatsButton = getEl('toggleStatsButton');
             const modalTitle = getEl('modalTitle');
-            const modalFullDescription = getEl('modalFullDescription');
+            const modalBodyContent = getEl('modalBodyContent');
             const authEmailInput = getEl('authEmail');
             const authPasswordInput = getEl('authPassword');
             const authError = getEl('authError');
@@ -301,7 +305,6 @@
             const logoutButton = getEl('logout-button');
             const userStatus = getEl('user-status');
             const themeToggleButton = getEl('theme-toggle');
-            // ***NEW*** Navbar elements
             const loginNavItem = getEl('login-nav-item');
             const userNavItem = getEl('user-nav-item');
             const userDisplayName = getEl('user-display-name');
@@ -385,16 +388,29 @@
 
             function initializeDataTable(data) {
                 tableErrorMessageDiv.style.display = 'none';
+                
+                const processedData = data.map(e => {
+                    const newEvent = { ...e }; 
+                    if (!newEvent.EventTitle && newEvent.Description) {
+                        const maxTitleLength = 70;
+                        newEvent.EventTitle = newEvent.Description.length > maxTitleLength
+                            ? newEvent.Description.substring(0, maxTitleLength - 3) + '...'
+                            : newEvent.Description;
+                    }
+                    return ALL_DATA_HEADERS.map(h => newEvent[h] || '');
+                });
+
                 let headerHtml = '<tr>';
-                UNIFIED_HEADERS.forEach(h => { headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`; });
+                ALL_DATA_HEADERS.forEach(h => { headerHtml += `<th>${h.replace(/([A-Z])/g, ' $1').trim()}</th>`; });
                 headerHtml += '</tr>';
                 $('#eventTable thead').html(headerHtml);
-                const colIdx = {}; UNIFIED_HEADERS.forEach((h, i) => colIdx[h] = i);
+                
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
 
                 if (eventDataTable) { eventDataTable.destroy(); $('#eventTable tbody').empty(); }
 
                 eventDataTable = $('#eventTable').DataTable({
-                    data: data.map(e => UNIFIED_HEADERS.map(h => e[h] || '')),
+                    data: processedData, 
                     responsive: true,
                     lengthMenu: [[25, 50, 100, -1], [25, 50, 100, "All"]],
                     pageLength: 25,
@@ -404,15 +420,10 @@
                             $(row).addClass('invitation-only');
                         }
                     },
+                    // ***UPDATED***: Hide Theme column as well
                     columnDefs: [
-                        { width: '8%', targets: colIdx.Weekday },
-                        { width: '8%', targets: colIdx.TimeRange },
-                        { width: '15%', targets: colIdx.Location, render: (d) => d ? `<a href="https://programoversigt.folkemoedet.dk/?location=${encodeURIComponent(d)}" target="_blank">${d}</a>` : '' },
-                        { width: '25%', targets: colIdx.Description, render: (d) => { const m = 45; if (d && d.length > m) return `<span class="text-primary" style="cursor: pointer;" data-fulltext="${d.replace(/"/g, '&quot;')}">${d.substring(0, m)}...</span>`; return d || ''; } },
-                        { width: '10%', targets: colIdx.EventURL, render: (d) => (d && d.startsWith('http')) ? `<a href="${d}" target="_blank">View Event</a>` : (d || '') },
-                        { width: '10%', targets: colIdx.DataSource, className: "text-center" },
-                        { width: '14%', targets: colIdx.Organizers },
-                        { width: '10%', targets: colIdx.Theme }
+                        { targets: [colIdx.Description, colIdx.EventURL, colIdx.Organizers, colIdx.DataSource, colIdx.Theme], visible: false },
+                        { targets: '_all', visible: true }
                     ]
                 });
 
@@ -426,7 +437,6 @@
                 if (!window.firebase) { setTimeout(setupAuthListener, 100); return; }
                 window.firebase.onAuthStateChanged(window.firebase.auth, (user) => {
                     if (user) {
-                        console.log("Auth state changed: User is logged in.", user.displayName || user.email);
                         const name = user.displayName || user.email;
                         userStatus.textContent = name;
                         userDisplayName.textContent = name;
@@ -434,7 +444,6 @@
                         userNavItem.style.display = 'block';
                         fetchEventsFromFirestore();
                     } else {
-                        console.log("Auth state changed: User is logged out.");
                         loginNavItem.style.display = 'block';
                         userNavItem.style.display = 'none';
                         if (eventDataTable) { eventDataTable.clear().draw(); }
@@ -448,18 +457,55 @@
             let currentSourceFilter = "All", currentDayFilter = "All";
             function applyFilters() {
                 if (!eventDataTable) return;
-                const dsIdx = UNIFIED_HEADERS.indexOf("DataSource"), wdIdx = UNIFIED_HEADERS.indexOf("Weekday");
+                const dsIdx = ALL_DATA_HEADERS.indexOf("DataSource"), wdIdx = ALL_DATA_HEADERS.indexOf("Weekday");
                 eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false).draw(false);
                 eventDataTable.column(wdIdx).search(currentDayFilter === "All" ? '' : '^' + currentDayFilter + '$', true, false).draw();
             }
             $('.source-filter-buttons .btn-check').on('change', function() { currentSourceFilter = $(this).data('source'); applyFilters(); });
             $('.filter-buttons .btn-check').on('change', function() { currentDayFilter = $(this).data('day'); applyFilters(); });
             
-            $('#eventTable tbody').on('click', 'span[data-fulltext]', function () {
-                const fullText = $(this).data('fulltext');
-                const title = $(this).closest('tr').find('td').eq(0).text();
-                modalTitle.textContent = title || "Details";
-                modalFullDescription.textContent = fullText;
+            $('#eventTable tbody').on('click', 'tr', function () {
+                const rowData = eventDataTable.row(this).data();
+                if (!rowData) return;
+
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
+                
+                const eventData = {};
+                ALL_DATA_HEADERS.forEach(header => {
+                    eventData[header] = rowData[colIdx[header]];
+                });
+
+                modalTitle.textContent = eventData.EventTitle || "Event Details";
+                
+                // ***UPDATED***: Dynamically build the modal body to show all event data
+                let modalHtml = `<ul class="list-group list-group-flush">`;
+                
+                // Define the order and labels for the modal
+                const modalDisplayOrder = [
+                    { key: 'Description', label: 'Description' },
+                    { key: 'Weekday', label: 'Day' },
+                    { key: 'TimeRange', label: 'Time' },
+                    { key: 'Location', label: 'Location' },
+                    { key: 'Organizers', label: 'Organizers' },
+                    { key: 'Theme', label: 'Theme' },
+                    { key: 'EventURL', label: 'Link' },
+                    { key: 'DataSource', label: 'Source' }
+                ];
+                
+                modalDisplayOrder.forEach(item => {
+                    const value = eventData[item.key];
+                    if (value) { // Only show item if it has a value
+                        if (item.key === 'EventURL' && value.startsWith('http')) {
+                            modalHtml += `<li class="list-group-item"><p class="text-muted mb-1 small">${item.label}</p><a href="${value}" target="_blank" rel="noopener noreferrer">View Original Event</a></li>`;
+                        } else {
+                            modalHtml += `<li class="list-group-item"><p class="text-muted mb-1 small">${item.label}</p><p class="mb-0">${value}</p></li>`;
+                        }
+                    }
+                });
+
+                modalHtml += `</ul>`;
+
+                modalBodyContent.innerHTML = modalHtml;
                 descriptionModalInstance.show();
             });
 
@@ -467,7 +513,6 @@
                 const hctx = getEl('eventsPerHourChart');
                 if (!hctx) return;
                 if (eventsPerHourChartInstance) eventsPerHourChartInstance.destroy();
-                // Use new primary color for charts
                 const primaryColor = 'rgba(221, 0, 121, 0.7)';
                 const primaryBorderColor = 'rgba(221, 0, 121, 1)';
                 
@@ -476,24 +521,24 @@
                     data: { labels: [], datasets: [{ label: 'Events/Hour', data: [], backgroundColor: primaryColor, borderColor: primaryBorderColor, borderWidth: 1 }] },
                     options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, responsive: true }
                 });
-                applyTheme(localStorage.theme === 'dark'); // Re-apply theme colors to new chart
+                applyTheme(localStorage.theme === 'dark'); 
             }
 
             function updateVisualizations() {
-                if (!eventDataTable || !eventsPerHourChartInstance) return;
+                if (!eventDataTable) return;
+                const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
                 const fData = eventDataTable.rows({ search: 'applied' }).data().toArray();
-                const trIdx = UNIFIED_HEADERS.indexOf("TimeRange");
-
+                
                 getEl('stat-total-events').textContent = fData.length;
                 let invOnlyCount = 0;
                 const locCounts = {}, hrCnt = {};
                 for (let i = 6; i < 24; i++) hrCnt[i.toString().padStart(2, '0')] = 0;
 
                 fData.forEach(r => {
-                    const tr = r[trIdx];
+                    const tr = r[colIdx.TimeRange];
                     if (tr) { const sm = tr.match(/^(\d{2}):\d{2}/); if (sm && hrCnt.hasOwnProperty(sm[1])) hrCnt[sm[1]]++; }
-                    const loc = r[UNIFIED_HEADERS.indexOf("Location")]; if (loc && loc.trim()) locCounts[loc] = (locCounts[loc] || 0) + 1;
-                    if ((r[UNIFIED_HEADERS.indexOf("EventTitle")] || '').includes('!!Kun med invitation!!') || (r[UNIFIED_HEADERS.indexOf("Description")] || '').includes('!!Kun med invitation!!')) invOnlyCount++;
+                    const loc = r[colIdx.Location]; if (loc && loc.trim()) locCounts[loc] = (locCounts[loc] || 0) + 1;
+                    if ((r[colIdx.EventTitle] || '').includes('!!Kun med invitation!!') || (r[colIdx.Description] || '').includes('!!Kun med invitation!!')) invOnlyCount++;
                 });
 
                 getEl('stat-invitation-only').textContent = invOnlyCount;
