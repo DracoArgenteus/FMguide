@@ -20,7 +20,8 @@
         // Import the functions you need from the SDKs
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-analytics.js";
-        // ***UPDATED***: Added sendPasswordResetEmail
+        // ***UPDATED***: Added getFunctions and httpsCallable
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-functions.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-auth.js";
         import { getFirestore, collection, getDocs, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.9.0/firebase-firestore.js";
       
@@ -41,11 +42,13 @@
             const auth = getAuth(app);
             const db = getFirestore(app);
             const analytics = getAnalytics(app);
+            const functions = getFunctions(app); // Initialize Cloud Functions
             window.firebase = { 
-                app, auth, db, 
+                app, auth, db, functions, // Add functions to window object
                 createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, 
                 collection, getDocs, analytics,
                 GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail,
+                httpsCallable, // Expose httpsCallable
                 doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, updateDoc, deleteField,
                 arrayUnion, arrayRemove
             };
@@ -92,8 +95,7 @@
                 <div class="modal-body">
                     <div data-mdb-input-init class="form-outline mb-4"><input type="email" id="authEmail" class="form-control" /><label class="form-label" for="authEmail">Email address</label></div>
                     <div data-mdb-input-init class="form-outline mb-4"><input type="password" id="authPassword" class="form-control" /><label class="form-label" for="authPassword">Password (min. 6 characters)</label></div>
-                    <!-- ***NEW*** Signup Key Field -->
-                    <div id="signup-key-wrapper" class="form-outline mb-4" data-mdb-input-init><input type="text" id="signupKey" class="form-control" /><label class="form-label" for="signupKey">Signup Key</label></div>
+                    <div id="signup-key-wrapper" class="form-outline mb-4" data-mdb-input-init><input type="text" id="inviteCode" class="form-control" /><label class="form-label" for="inviteCode">Invite Code</label></div>
                     <p id="authError" class="text-danger small mb-3" style="display: none;"></p>
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <a href="#" id="forgot-password-link">Forgot Password?</a>
@@ -109,7 +111,7 @@
         </div>
     </div>
     
-    <!-- ***NEW*** Password Reset Modal -->
+    <!-- Password Reset Modal -->
     <div class="modal fade" id="passwordResetModal" tabindex="-1" aria-labelledby="passwordResetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -192,7 +194,7 @@
         <footer class="mt-5 text-center text-muted small"><p>&copy; <span id="currentYear"></span> Folkemødet Event Viewer.</p></footer>
     </div>
     
-    <!-- ***UPDATED*** Split into two modals: details and calendar -->
+    <!-- Split Modals: details and calendar -->
     <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -231,8 +233,7 @@
     <script>
         document.getElementById('currentYear').textContent = new Date().getFullYear();
         const ALL_DATA_HEADERS = ["Favorite", "EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource", "id"];
-        const SIGNUP_KEY = "FM2025"; // Demo key, should be handled securely in a real app
-
+        
         $(document).ready(function() {
             let eventDataTable = null, detailsModalInstance, calendarModalInstance, teamsModalInstance, authModalInstance, passwordResetModalInstance;
             let allEvents = [], teamFavorites = new Map(), teamMembers = new Map();
@@ -258,19 +259,24 @@
 
             // --- FIREBASE AUTH & DATA LOGIC ---
             async function handleSignup() {
-                const signupKey = getEl('signupKey').value;
+                const { functions, httpsCallable } = window.firebase;
                 const authError = getEl('authError');
-                if (signupKey !== SIGNUP_KEY) {
-                    authError.textContent = "Invalid Signup Key.";
-                    authError.style.display = 'block';
-                    return;
-                }
-                if (!window.firebase) return;
-                const email = getEl('authEmail').value;
-                const password = getEl('authPassword').value;
+                authError.style.display = 'none';
+
+                const createNewUser = httpsCallable(functions, 'createNewUser');
                 try {
-                    await window.firebase.createUserWithEmailAndPassword(window.firebase.auth, email, password);
-                    authModalInstance.hide();
+                    const result = await createNewUser({
+                        email: getEl('authEmail').value,
+                        password: getEl('authPassword').value,
+                        inviteCode: getEl('inviteCode').value,
+                    });
+
+                    if (result.data.status === 'success') {
+                        console.log('User created via function:', result.data.user);
+                        authModalInstance.hide();
+                    } else {
+                         throw new Error(result.data.message || 'An unknown error occurred.');
+                    }
                 } catch (error) {
                     authError.textContent = error.message;
                     authError.style.display = 'block';
