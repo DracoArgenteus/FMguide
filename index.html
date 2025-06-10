@@ -200,7 +200,7 @@
             let eventDataTable = null, mainModalInstance, teamsModalInstance, authModalInstance;
             let allEvents = [], teamFavorites = new Map(), teamMembers = new Map();
             let favoriteEvents = new Set(), currentUserId = null, currentTeamId = null;
-            let unsubscribeFavorites = () => {}, unsubscribeUser = () => {}, unsubscribeTeam = () => {}, unsubscribeTeamFavorites = () => {};
+            let unsubscribeFavorites = () => {}, unsubscribeUser = () => {}, unsubscribeTeam = () => {};
 
             // --- DOM ELEMENT GETTERS ---
             const getEl = (id) => document.getElementById(id);
@@ -231,20 +231,27 @@
             // --- FIREBASE AUTH & DATA LOGIC ---
             async function toggleFavorite(eventId, isFavorited) {
                 if (!currentUserId || !window.firebase) return;
-                const { db, doc, setDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove } = window.firebase;
+                const { db, doc, setDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove, getDoc, deleteField } = window.firebase;
                 const favDocRef = doc(db, "users", currentUserId, "favorites", eventId);
+                const teamRef = currentTeamId ? doc(db, 'teams', currentTeamId) : null;
+
                 try {
                     if (isFavorited) { // Un-favoriting
                         await deleteDoc(favDocRef);
-                        if (currentTeamId) {
-                            const teamFavRef = doc(db, 'teams', currentTeamId, 'team_favorites', eventId);
-                            await updateDoc(teamFavRef, { favoritedBy: arrayRemove(currentUserId) });
+                        if (teamRef) {
+                            const teamDoc = await getDoc(teamRef);
+                            if (teamDoc.exists() && teamDoc.data().favorites && teamDoc.data().favorites[eventId]) {
+                                if (teamDoc.data().favorites[eventId].length === 1) {
+                                    await updateDoc(teamRef, { [`favorites.${eventId}`]: deleteField() });
+                                } else {
+                                    await updateDoc(teamRef, { [`favorites.${eventId}`]: arrayRemove(currentUserId) });
+                                }
+                            }
                         }
                     } else { // Favoriting
                         await setDoc(favDocRef, { addedAt: new Date() });
-                        if (currentTeamId) {
-                            const teamFavRef = doc(db, 'teams', currentTeamId, 'team_favorites', eventId);
-                            await setDoc(teamFavRef, { favoritedBy: arrayUnion(currentUserId) }, { merge: true });
+                        if (teamRef) {
+                            await updateDoc(teamRef, { [`favorites.${eventId}`]: arrayUnion(currentUserId) });
                         }
                     }
                 } catch (error) { console.error("Error updating favorite:", error); }
@@ -256,7 +263,7 @@
                 const teamRef = doc(collection(db, 'teams'));
                 const userRef = doc(db, 'users', currentUserId);
                 const batch = writeBatch(db);
-                batch.set(teamRef, { members: { [currentUserId]: userDisplayName.textContent } });
+                batch.set(teamRef, { members: { [currentUserId]: userDisplayName.textContent }, favorites: {} }); 
                 batch.update(userRef, { teamId: teamRef.id });
                 await batch.commit();
                 teamsModalInstance.hide();
@@ -300,7 +307,7 @@
                 if (!window.firebase) { setTimeout(setupAuthListener, 100); return; }
                 const { auth, onAuthStateChanged, db, doc, onSnapshot, setDoc, collection } = window.firebase;
                 onAuthStateChanged(auth, (user) => {
-                    unsubscribeFavorites(); unsubscribeUser(); unsubscribeTeam(); unsubscribeTeamFavorites();
+                    unsubscribeFavorites(); unsubscribeUser(); unsubscribeTeam();
                     teamFavorites.clear(); teamMembers.clear();
                     if (user) {
                         currentUserId = user.uid;
@@ -315,8 +322,7 @@
 
                         unsubscribeUser = onSnapshot(userRef, (doc) => {
                             currentTeamId = doc.data()?.teamId || null;
-                            updateTeamViewUI();
-                            listenToTeamChanges();
+                            listenToTeamChanges(); 
                         });
 
                         const favsRef = collection(db, "users", currentUserId, "favorites");
@@ -326,10 +332,10 @@
                             if (eventDataTable) eventDataTable.rows().invalidate('data').draw(false);
                         });
 
-                        if (!allEvents.length) fetchEventsFromFirestore();
+                        loadEvents(); // Load events from cache or Firestore
                     } else {
                         currentUserId = null; currentTeamId = null;
-                        favoriteEvents.clear();
+                        favoriteEvents.clear(); allEvents = [];
                         loginNavItem.style.display = 'block'; userNavItem.style.display = 'none';
                         if (eventDataTable) { eventDataTable.clear().draw(); }
                         getEl('dataFreshness').textContent = "Please log in to view event data.";
@@ -338,40 +344,38 @@
             }
 
             function listenToTeamChanges() {
-                unsubscribeTeam(); unsubscribeTeamFavorites();
+                unsubscribeTeam();
                 teamMembers.clear(); teamFavorites.clear();
                 if (!currentTeamId || !window.firebase) { renderCalendarView(); updateTeamViewUI(); return; }
                 
-                const { db, doc, onSnapshot, collection } = window.firebase;
+                const { db, doc, onSnapshot } = window.firebase;
                 const teamRef = doc(db, 'teams', currentTeamId);
                 
                 unsubscribeTeam = onSnapshot(teamRef, (teamDoc) => {
-                    unsubscribeTeamFavorites();
                     if (teamDoc.exists()) {
-                        teamMembers = new Map(Object.entries(teamDoc.data().members || {}));
-                        updateTeamViewUI();
+                        const data = teamDoc.data();
+                        teamMembers = new Map(Object.entries(data.members || {}));
                         
-                        const teamFavsRef = collection(db, 'teams', currentTeamId, 'team_favorites');
-                        unsubscribeTeamFavorites = onSnapshot(teamFavsRef, (snapshot) => {
-                            const newTeamFavorites = new Map();
-                            teamMembers.forEach((name, memberId) => newTeamFavorites.set(memberId, new Set()));
+                        const newTeamFavorites = new Map();
+                        teamMembers.forEach((name, memberId) => newTeamFavorites.set(memberId, new Set()));
 
-                            snapshot.forEach(doc => {
-                                const eventId = doc.id;
-                                const data = doc.data();
-                                if (data.favoritedBy && Array.isArray(data.favoritedBy)) {
-                                    data.favoritedBy.forEach(userId => {
-                                        if (newTeamFavorites.has(userId)) {
-                                            newTeamFavorites.get(userId).add(eventId);
-                                        }
-                                    });
-                                }
-                            });
-                            teamFavorites = newTeamFavorites;
-                            if (document.getElementById('mainModal').classList.contains('show')) {
-                                renderCalendarView();
+                        const teamFavsData = data.favorites || {};
+                        for (const eventId in teamFavsData) {
+                            const favoritedBy = teamFavsData[eventId];
+                            if(Array.isArray(favoritedBy)) {
+                                favoritedBy.forEach(userId => {
+                                    if(newTeamFavorites.has(userId)) {
+                                        newTeamFavorites.get(userId).add(eventId);
+                                    }
+                                });
                             }
-                        });
+                        }
+                        teamFavorites = newTeamFavorites;
+                        
+                        updateTeamViewUI();
+                        if (document.getElementById('mainModal').classList.contains('show')) {
+                           renderCalendarView();
+                        }
                     } else {
                         currentTeamId = null;
                         updateTeamViewUI();
@@ -379,21 +383,41 @@
                 });
             }
 
-            async function fetchEventsFromFirestore() {
-                if (!window.firebase) return;
-                getEl('dataFreshness').textContent = "Fetching data...";
+            async function loadEvents() {
                 const { db, collection, getDocs } = window.firebase;
+                const dataFreshnessElement = getEl('dataFreshness');
+                const cacheKey = 'fm_events_cache';
+                const cacheDuration = 60 * 60 * 1000; // 1 hour in milliseconds
+
                 try {
-                    const querySnapshot = await getDocs(collection(db, "events"));
-                    allEvents = [];
-                    querySnapshot.forEach((doc) => allEvents.push({ ...doc.data(), id: doc.id }));
-                    getEl('dataFreshness').textContent = `Live data loaded.`;
-                    initializeDataTable(allEvents);
+                    const cachedData = JSON.parse(localStorage.getItem(cacheKey));
+
+                    if (cachedData && (Date.now() - cachedData.timestamp < cacheDuration)) {
+                        console.log("Loading events from cache.");
+                        allEvents = cachedData.events;
+                        dataFreshnessElement.textContent = `Live data loaded (cached).`;
+                        initializeDataTable(allEvents);
+                    } else {
+                        console.log("Cache expired or empty. Fetching fresh events from Firestore.");
+                        dataFreshnessElement.textContent = "Fetching data...";
+                        const querySnapshot = await getDocs(collection(db, "events"));
+                        allEvents = [];
+                        querySnapshot.forEach((doc) => allEvents.push({ ...doc.data(), id: doc.id }));
+                        
+                        localStorage.setItem(cacheKey, JSON.stringify({
+                            events: allEvents,
+                            timestamp: Date.now()
+                        }));
+
+                        dataFreshnessElement.textContent = `Live data loaded.`;
+                        initializeDataTable(allEvents);
+                    }
                 } catch (error) {
-                    console.error("Error fetching events:", error);
-                    getEl('dataFreshness').textContent = "Error loading data.";
+                    console.error("Error loading events:", error);
+                    dataFreshnessElement.textContent = "Error loading data.";
                 }
             }
+
 
             function initializeDataTable(data) {
                 const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
@@ -433,7 +457,6 @@
                     ]
                 });
                 
-                // ***FIXED*** Added listener for table draw events to update visualizations
                 eventDataTable.on('draw.dt search.dt', updateVisualizations);
             }
             
@@ -486,13 +509,12 @@
             getEl('leave-team-button').addEventListener('click', leaveTeam);
             getEl('copy-team-id').addEventListener('click', () => navigator.clipboard.writeText(currentTeamId));
 
-            // ***FIXED*** Added listeners for filter buttons
             let currentSourceFilter = "All", currentDayFilter = "All";
             function applyFilters() {
                 if (!eventDataTable) return;
                 const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
                 const dsIdx = colIdx.DataSource, wdIdx = colIdx.Weekday;
-                eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false).draw(false);
+                eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false);
                 eventDataTable.column(wdIdx).search(currentDayFilter === "All" ? '' : '^' + currentDayFilter + '$', true, false).draw();
             }
             $('.source-filter-buttons .btn-check').on('change', function() { currentSourceFilter = $(this).data('source'); applyFilters(); });
@@ -572,7 +594,6 @@
                             calendarHtml += `<div class="time-line" style="top: ${top}px;"></div>`;
                         }
 
-                        // A simple algorithm to prevent overlapping
                         const placedEvents = [];
                         eventsByDay[day].sort((a,b) => (a.event.TimeRange || "").localeCompare(b.event.TimeRange || "")).forEach(({event, users}) => {
                             const timeParts = (event.TimeRange || "00:00-00:00").split('-');
@@ -592,13 +613,12 @@
                             }
                             const userHtml = users.map(u => u.name).join(', ');
 
-                            // Find a non-overlapping column
                             let column = 0;
                             while(placedEvents.some(p => p.column === column && top < p.end && (top + height) > p.top)) {
                                 column++;
                             }
                             placedEvents.push({top, end: top + height, column});
-                            const left = 65 + (column * 155); // 150px width + 5px margin
+                            const left = 65 + (column * 155);
 
                             calendarHtml += `<div class="${eventClass}" style="top: ${top}px; height: ${height}px; width: 150px; left: ${left}px;"><strong>${event.EventTitle}</strong><br><small><i>${userHtml}</i></small></div>`;
                         });
