@@ -1,0 +1,51 @@
+name: Merge Event Data to JSON
+
+# This action automatically merges multiple CSV event files into a single,
+# web-ready JSON file. It ensures the data displayed on your site is
+# always synchronized with your sources.
+
+on:
+  # Triggers the workflow on push events but only for the main branch
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/official_events_combined.csv'
+      - 'data/folkemoedet_private_events.csv'
+      - 'data/social_events.csv'
+      - 'scripts/merge_script.py'
+
+  # Allows you to run this workflow manually from the Actions tab on GitHub
+  workflow_dispatch:
+
+jobs:
+  merge-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checks out your repository so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the Python environment
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Step 3: Run the Python merge script
+      - name: Merge CSVs and convert to JSON
+        run: python /scripts/merge_script.py
+
+      # Step 4: Commit the generated JSON file back to the repository if it changed
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/events.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit. events.json is already up-to-date."
+          else
+            git commit -m "Automated: Update public/events.json from CSV sources"
+            git push
+          fi
