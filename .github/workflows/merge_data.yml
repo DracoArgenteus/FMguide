@@ -35,7 +35,7 @@ jobs:
 
       # Step 3: Run the Python merge script
       - name: Merge CSVs and convert to JSON
-        run: python /scripts/merge_script.py
+        run: python scripts/merge_script.py
 
       # Step 4: Commit the generated JSON file back to the repository if it changed
       - name: Commit and push if changed
