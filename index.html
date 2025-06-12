@@ -91,33 +91,10 @@
                 <div class="modal-body">
                     <div data-mdb-input-init class="form-outline mb-4"><input type="email" id="authEmail" class="form-control" /><label class="form-label" for="authEmail">Email address</label></div>
                     <div data-mdb-input-init class="form-outline mb-4"><input type="password" id="authPassword" class="form-control" /><label class="form-label" for="authPassword">Password (min. 6 characters)</label></div>
-                    <div id="signup-key-wrapper" class="form-outline mb-4" data-mdb-input-init><input type="text" id="inviteCode" class="form-control" /><label class="form-label" for="inviteCode">Invite Code</label></div>
                     <p id="authError" class="text-danger small mb-3" style="display: none;"></p>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <a href="#" id="forgot-password-link">Forgot Password?</a>
-                        <div>
-                            <button id="authSignUpButton" type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-light me-2">Sign Up</button>
-                            <button id="authLoginButton" type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-primary">Login</button>
-                        </div>
-                    </div>
+                    <div class="d-flex justify-content-end mb-3"><button id="authSignUpButton" type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-light me-2">Sign Up</button><button id="authLoginButton" type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-primary">Login</button></div>
                     <hr/>
                     <div class="text-center"><button id="googleLoginButton" type="button" data-mdb-button-init data-mdb-ripple-init class="btn btn-primary btn-block"><i class="fab fa-google me-2"></i>Continue with Google</button></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Password Reset Modal -->
-    <div class="modal fade" id="passwordResetModal" tabindex="-1" aria-labelledby="passwordResetModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="passwordResetModalLabel">Reset Password</h5><button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body">
-                    <p>Enter your email address and we will send you a link to reset your password.</p>
-                    <div data-mdb-input-init class="form-outline mb-4"><input type="email" id="resetEmail" class="form-control" /><label class="form-label" for="resetEmail">Email address</label></div>
-                    <p id="resetError" class="text-danger small" style="display: none;"></p>
-                    <p id="resetSuccess" class="text-success small" style="display: none;"></p>
-                    <button id="resetPasswordButton" class="btn btn-primary btn-block">Send Reset Link</button>
                 </div>
             </div>
         </div>
@@ -169,7 +146,6 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                             <li><h6 class="dropdown-header" id="user-status">Signed in as</h6></li>
                             <li><hr class="dropdown-divider" /></li>
-                            <li><a class="dropdown-item" href="#" id="reset-password-menu-item"><i class="fas fa-key me-2"></i>Reset Password</a></li>
                             <li><a class="dropdown-item" href="#" id="logout-button"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                         </ul>
                     </li>
@@ -230,7 +206,7 @@
         const ALL_DATA_HEADERS = ["Favorite", "EventTitle", "Weekday", "TimeRange", "Location", "Description", "EventURL", "Organizers", "Theme", "DataSource", "id"];
         
         $(document).ready(function() {
-            let eventDataTable = null, detailsModalInstance, calendarModalInstance, teamsModalInstance, authModalInstance, passwordResetModalInstance;
+            let eventDataTable = null, detailsModalInstance, calendarModalInstance, teamsModalInstance, authModalInstance;
             let allEvents = [], teamFavorites = new Map(), teamMembers = new Map();
             let favoriteEvents = new Set(), currentUserId = null, currentTeamId = null;
             let unsubscribeFavorites = () => {}, unsubscribeUser = () => {}, unsubscribeTeam = () => {};
@@ -240,7 +216,6 @@
             calendarModalInstance = new mdb.Modal(getEl('calendarModal'));
             teamsModalInstance = new mdb.Modal(getEl('teamsModal'));
             authModalInstance = new mdb.Modal(getEl('authModal'));
-            passwordResetModalInstance = new mdb.Modal(getEl('passwordResetModal'));
 
             function applyTheme(isDark) {
                 document.documentElement.setAttribute('data-mdb-theme', isDark ? 'dark' : 'light');
@@ -268,7 +243,6 @@
                 const { db, doc, setDoc, deleteDoc, updateDoc, arrayUnion, arrayRemove, getDoc, deleteField } = window.firebase;
                 const favDocRef = doc(db, "users", currentUserId, "favorites", eventId);
                 const teamRef = currentTeamId ? doc(db, 'teams', currentTeamId) : null;
-
                 try {
                     if (isFavorited) {
                         await deleteDoc(favDocRef);
@@ -308,11 +282,9 @@
                 const { db, doc, getDoc, updateDoc } = window.firebase;
                 const teamIdToJoin = getEl('join-team-id-input').value.trim();
                 if (!teamIdToJoin) return;
-                
                 const teamRef = doc(db, 'teams', teamIdToJoin);
                 const teamDoc = await getDoc(teamRef);
                 const joinErrorEl = getEl('join-team-error');
-
                 if (teamDoc.exists()) {
                     const userRef = doc(db, 'users', currentUserId);
                     const newMemberField = `members.${currentUserId}`;
@@ -348,17 +320,14 @@
                         const userRef = doc(db, 'users', currentUserId);
                         const userName = user.displayName || user.email.split('@')[0];
                         setDoc(userRef, { name: userName, email: user.email }, { merge: true });
-
                         getEl('user-display-name').textContent = userName;
                         getEl('user-status').textContent = user.email;
                         getEl('login-nav-item').style.display = 'none';
                         getEl('user-nav-item').style.display = 'block';
-
                         unsubscribeUser = onSnapshot(userRef, (doc) => {
                             currentTeamId = doc.data()?.teamId || null;
                             listenToTeamChanges(); 
                         });
-
                         const favsRef = collection(db, "users", currentUserId, "favorites");
                         unsubscribeFavorites = onSnapshot(favsRef, (snapshot) => {
                             favoriteEvents.clear();
@@ -379,18 +348,14 @@
                 unsubscribeTeam();
                 teamMembers.clear(); teamFavorites.clear();
                 if (!currentTeamId || !window.firebase) { renderCalendarTabs(); updateTeamViewUI(); return; }
-                
                 const { db, doc, onSnapshot } = window.firebase;
                 const teamRef = doc(db, 'teams', currentTeamId);
-                
                 unsubscribeTeam = onSnapshot(teamRef, (teamDoc) => {
                     if (teamDoc.exists()) {
                         const data = teamDoc.data();
                         teamMembers = new Map(Object.entries(data.members || {}));
-                        
                         const newTeamFavorites = new Map();
                         teamMembers.forEach((name, memberId) => newTeamFavorites.set(memberId, new Set()));
-
                         const teamFavsData = data.favorites || {};
                         for (const eventId in teamFavsData) {
                             const favoritedBy = teamFavsData[eventId];
@@ -403,7 +368,6 @@
                             }
                         }
                         teamFavorites = newTeamFavorites;
-                        
                         updateTeamViewUI();
                         if (document.getElementById('calendarModal').classList.contains('show')) {
                            renderCalendarTabs();
@@ -420,11 +384,10 @@
                  try {
                      dataFreshnessElement.textContent = "Loading data...";
                      const response = await fetch('./public/events.json');
-                     if (!response.ok) {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                     }
-                     allEvents = await response.json();
-                     dataFreshnessElement.textContent = `Live data loaded.`;
+                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                     let rawEvents = await response.json();
+                     allEvents = rawEvents.filter(event => event.Description && event.Description.trim() !== '');
+                     dataFreshnessElement.textContent = `Live data loaded. Filtered out ${rawEvents.length - allEvents.length} incomplete events.`;
                      initializeDataTable(allEvents);
                  } catch (error) {
                      console.error("Error loading events:", error);
@@ -437,7 +400,6 @@
 
             function initializeDataTable(data) {
                 const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
-            
                 const processedData = data.map(e => {
                     const newEvent = { ...e };
                     if (!newEvent.EventTitle && newEvent.Description) {
@@ -519,7 +481,6 @@
                     authModalInstance.show();
                 }
             });
-            // ***FIXED***: Render calendar tabs only after modal is shown
             getEl('calendarModal').addEventListener('shown.mdb.modal', renderCalendarTabs);
 
             getEl('create-team-button').addEventListener('click', createTeam);
@@ -575,20 +536,26 @@
                 modalHtml += `</ul>`;
                 detailsModalBody.innerHTML = modalHtml;
             }
+            
+            function renderCalendarTabs(){
+                renderPersonalCalendar();
+                renderTeamCalendar();
+            }
 
-            function renderCalendarTabs() {
+            function renderPersonalCalendar() {
                 const personalPane = getEl('personal-calendar-pane');
-                const teamPane = getEl('team-calendar-pane');
-
-                // Render Personal Calendar
+                if(!personalPane) return;
                 const personalFavs = allEvents.filter(e => favoriteEvents.has(e.id));
                 if (personalFavs.length === 0) {
                     personalPane.innerHTML = `<p class="text-center text-muted mt-4">You haven't added any events to your calendar yet. Click the <i class="far fa-heart"></i> icon on an event to add it.</p>`;
-                } else {
-                    personalPane.innerHTML = buildCalendarTimeline(personalFavs);
+                    return;
                 }
+                personalPane.innerHTML = buildCalendarTimeline(personalFavs);
+            }
 
-                // Render Team Calendar
+            function renderTeamCalendar() {
+                const teamPane = getEl('team-calendar-pane');
+                if(!teamPane) return;
                 if (!currentTeamId) {
                     teamPane.innerHTML = `<p class="text-center text-muted mt-4">You are not in a team. Join or create one via the "My Team" button.</p>`;
                     return;
@@ -615,10 +582,9 @@
                 }
             }
 
-
             function buildCalendarTimeline(eventsData) {
                  const eventsByDay = eventsData.reduce((acc, data) => {
-                    const event = data.event || data; // Handle both personal and team data structure
+                    const event = data.event || data; 
                     if (!acc[event.Weekday]) acc[event.Weekday] = [];
                     acc[event.Weekday].push(data);
                     return acc;
