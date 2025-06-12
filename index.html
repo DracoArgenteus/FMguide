@@ -347,7 +347,13 @@
             function listenToTeamChanges() {
                 unsubscribeTeam();
                 teamMembers.clear(); teamFavorites.clear();
-                if (!currentTeamId || !window.firebase) { renderCalendarTabs(); updateTeamViewUI(); return; }
+                if (!currentTeamId || !window.firebase) {
+                    if (document.getElementById('calendarModal').classList.contains('show')) {
+                        renderCalendarTabs();
+                    }
+                    updateTeamViewUI();
+                    return;
+                }
                 const { db, doc, onSnapshot } = window.firebase;
                 const teamRef = doc(db, 'teams', currentTeamId);
                 unsubscribeTeam = onSnapshot(teamRef, (teamDoc) => {
@@ -386,8 +392,9 @@
                      const response = await fetch('./public/events.json');
                      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                      let rawEvents = await response.json();
-                     allEvents = rawEvents.filter(event => event.Description && event.Description.trim() !== '');
-                     dataFreshnessElement.textContent = `Live data loaded. Filtered out ${rawEvents.length - allEvents.length} incomplete events.`;
+                     const originalCount = rawEvents.length;
+                     allEvents = rawEvents.filter(event => (event.EventTitle && event.EventTitle.trim() !== '') || (event.Description && event.Description.trim() !== ''));
+                     dataFreshnessElement.textContent = `Live data loaded. Displaying ${allEvents.length} of ${originalCount} total events.`;
                      initializeDataTable(allEvents);
                  } catch (error) {
                      console.error("Error loading events:", error);
