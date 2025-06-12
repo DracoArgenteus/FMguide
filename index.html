@@ -378,7 +378,7 @@
             function listenToTeamChanges() {
                 unsubscribeTeam();
                 teamMembers.clear(); teamFavorites.clear();
-                if (!currentTeamId || !window.firebase) { renderCalendarView(); updateTeamViewUI(); return; }
+                if (!currentTeamId || !window.firebase) { renderCalendarTabs(); updateTeamViewUI(); return; }
                 
                 const { db, doc, onSnapshot } = window.firebase;
                 const teamRef = doc(db, 'teams', currentTeamId);
@@ -406,7 +406,7 @@
                         
                         updateTeamViewUI();
                         if (document.getElementById('calendarModal').classList.contains('show')) {
-                           renderCalendarView();
+                           renderCalendarTabs();
                         }
                     } else {
                         currentTeamId = null;
@@ -514,13 +514,13 @@
 
             getEl('calendar-button').addEventListener('click', () => {
                 if(currentUserId) {
-                    renderPersonalCalendar();
-                    renderTeamCalendar();
                     calendarModalInstance.show();
                 } else {
                     authModalInstance.show();
                 }
             });
+            // ***FIXED***: Render calendar tabs only after modal is shown
+            getEl('calendarModal').addEventListener('shown.mdb.modal', renderCalendarTabs);
 
             getEl('create-team-button').addEventListener('click', createTeam);
             getEl('join-team-button').addEventListener('click', joinTeam);
@@ -532,7 +532,7 @@
                 if (!eventDataTable) return;
                 const colIdx = {}; ALL_DATA_HEADERS.forEach((h, i) => colIdx[h] = i);
                 const dsIdx = colIdx.DataSource, wdIdx = colIdx.Weekday;
-                eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false).draw();
+                eventDataTable.column(dsIdx).search(currentSourceFilter === "All" ? '' : '^' + currentSourceFilter + '$', true, false);
                 eventDataTable.column(wdIdx).search(currentDayFilter === "All" ? '' : '^' + currentDayFilter + '$', true, false).draw();
             }
             $('.source-filter-buttons .btn-check').on('change', function() { currentSourceFilter = $(this).data('source'); applyFilters(); });
@@ -576,20 +576,19 @@
                 detailsModalBody.innerHTML = modalHtml;
             }
 
-            function renderPersonalCalendar() {
+            function renderCalendarTabs() {
                 const personalPane = getEl('personal-calendar-pane');
-                if(!personalPane) return;
+                const teamPane = getEl('team-calendar-pane');
+
+                // Render Personal Calendar
                 const personalFavs = allEvents.filter(e => favoriteEvents.has(e.id));
                 if (personalFavs.length === 0) {
                     personalPane.innerHTML = `<p class="text-center text-muted mt-4">You haven't added any events to your calendar yet. Click the <i class="far fa-heart"></i> icon on an event to add it.</p>`;
-                    return;
+                } else {
+                    personalPane.innerHTML = buildCalendarTimeline(personalFavs);
                 }
-                personalPane.innerHTML = buildCalendarTimeline(personalFavs);
-            }
 
-            function renderTeamCalendar() {
-                const teamPane = getEl('team-calendar-pane');
-                if(!teamPane) return;
+                // Render Team Calendar
                 if (!currentTeamId) {
                     teamPane.innerHTML = `<p class="text-center text-muted mt-4">You are not in a team. Join or create one via the "My Team" button.</p>`;
                     return;
@@ -611,11 +610,11 @@
 
                 if (allTeamFavs.size === 0) {
                     teamPane.innerHTML = `<p class="text-center text-muted mt-4">Your team calendar is empty.</p>`;
-                    return;
+                } else {
+                    teamPane.innerHTML = buildCalendarTimeline(Array.from(allTeamFavs.values()));
                 }
-                
-                teamPane.innerHTML = buildCalendarTimeline(Array.from(allTeamFavs.values()));
             }
+
 
             function buildCalendarTimeline(eventsData) {
                  const eventsByDay = eventsData.reduce((acc, data) => {
